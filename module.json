@@ -1,0 +1,41 @@
+{
+  "id": "jay-helpers",
+  "title": "Jay Macros",
+  "description": "Foundry VTT module that has Jason's little fixes.",
+  "version": "1.0.0",
+  "compatibility": {
+    "minimum": "12",
+    "verified": "12"
+  },
+  "relationships": {
+    "systems": [
+      {
+        "id": "dnd5e",
+        "type": "system",
+        "compatibility": {
+          "minimum": "4.0",
+          "verified": "4.0"
+        }
+      }
+    ]
+  },
+  "esmodules": [
+    "scripts/main.mjs"
+  ],
+  "languages": [
+    {
+      "lang": "en",
+      "name": "English",
+      "path": "lang/en.json",
+      "flags": {}
+    }
+  ],
+  "url": "https://github.com/jstapels/jay-helpers",
+  "bugs": "https://github.com/jstapels/jay-helpers/issues",
+  "changelog": "https://github.com/jstapels/jay-helpers/releases",
+  "license": "https://github.com/jstapels/jay-helpers/raw/main/LICENSE",
+  "readme": "https://github.com/jstapels/jay-helpers/main/README.md",
+  "manifest": "https://github.com/jstapels/jay-helpers/releases/latest/download/module.json",
+  "download": "https://github.com/jstapels/jay-helpers/releases/download/v1.0.0/jay-helpers.zip",
+  "authors": [{"name": "Jason Stapels"}]
+}

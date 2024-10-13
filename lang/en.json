@@ -1,0 +1,22 @@
+{
+    "jay-helpers": {
+        "settings": {
+            "trackAction": {
+                "name": "Track action?",
+                "hint": "Track when a token takes an action."
+            },
+            "trackBonus": {
+                "name": "Track bonus action?",
+                "hint": "Track when a token takes a bonus action."
+            },
+            "trackReaction": {
+                "name": "Track reaction?",
+                "hint": "Track when a token take a reaction."
+            },
+            "trackOpportunity": {
+                "name": "Track opportunity attacks (as reaction)?",
+                "hint": "Treat off turn attacks as opportunity attacks, that use a reaction."
+            }
+        }
+    }
+}
