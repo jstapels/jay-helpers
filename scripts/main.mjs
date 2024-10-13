@@ -164,7 +164,7 @@ let clearActionEffects = (actor) => {
 };
 
 let combatTurnChange = (combat) => {
-  if (!combat.combatant.isOwner) return;
+  if (!combat?.combatant?.isOwner) return;
 
   let actor = combat.combatant?.actor;
   if (!actor) return;
