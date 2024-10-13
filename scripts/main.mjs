@@ -40,8 +40,8 @@ const actionConfig = {
 const actionSetting = {
   action: SETTING_TRACK_ACTION,
   bonus: SETTING_TRACK_BONUS,
-  reaction: SETTING_TRACK_REACTION
-}
+  reaction: SETTING_TRACK_REACTION,
+};
 
 const checkActionUsage = (actor, item, actionType) => {
   const existingEffect = actor.effects.find((e) => {
@@ -106,7 +106,7 @@ let preUseActivity = (activity) => {
   }
 
   const settingId = actionSetting[actionType];
-  if (!settingId || !game.settings.get(MODULE_ID, SETTING_TRACK_ACTION)) {
+  if (!settingId || !game.settings.get(MODULE_ID, settingId)) {
     return true;
   }
 
