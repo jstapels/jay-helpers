@@ -172,6 +172,26 @@ let combatTurnChange = (combat) => {
   clearActionEffects(actor);
 };
 
+// Remove Identify button at top of Item Sheet
+const removeIdentifyButton = (sheet, [html]) => {
+  if (game.user.isGM) return;
+  const unidentified = sheet.item.system.identified === false;
+  if (!unidentified) return;
+  html.querySelectorAll(".pseudo-header-button.state-toggle.toggle-identified")
+    .forEach((n) => n.remove());
+};
+
+
+// Remove Identify button from Item Context menu on Actor Sheet
+const removeIdentifyMenu = (item, buttons) => {
+  if (game.user.isGM) return;
+  const unidentified = item.system.identified === false;
+  if (!unidentified) return;
+  const identifyIndex = buttons.findIndex((opt) => opt.name === 'DND5E.Identify');
+  if (identifyIndex) {
+    buttons.splice(identifyIndex, 1);
+  }
+};
 
 /**
  * Called when Foundry has been initialized.
@@ -230,6 +250,8 @@ const readyHook = () => {
   Hooks.on('dnd5e.preRollAttackV2', preRollAttack);
   Hooks.on('dnd5e.rollAttackV2', rollAttack);
   Hooks.on('combatTurnChange', combatTurnChange);
+  Hooks.on("renderItemSheet5e2", removeIdentifyButton);
+  Hooks.on("dnd5e.getItemContextOptions", removeIdentifyMenu);
 };
 
 Hooks.once('init', initHook);
