@@ -92,7 +92,7 @@ let preUseActivity = (activity) => {
   // Only proceed if owner of token got this event.
   const item = activity?.parent?.parent;
   const actor = item?.actor;
-  if (!actor?.isOwner) return true;
+  // if (!actor?.isOwner) return true;
 
   // Make sure actor is IN the combat.
   const combatant = game.combat.getCombatantByActor(actor);
@@ -122,7 +122,7 @@ let preRollAttack = (config) => {
   const activity = config.subject;
   const item = activity?.parent?.parent;
   const actor = item?.actor;
-  if (!actor?.isOwner) return true;
+  // if (!actor?.isOwner) return true;
   if (!game.combat?.combatant) return true;
 
   const combatant = game.combat.getCombatantByActor(item.actor);
@@ -140,7 +140,7 @@ let rollAttack = (rolls, data) => {
   const activity = data.subject;
   const item = activity?.parent?.parent;
   const actor = item?.actor;
-  if (!actor?.isOwner) return;
+  // if (!actor?.isOwner) return;
   if (!game.combat?.combatant) return;
 
   const combatant = game.combat.getCombatantByActor(item.actor);
@@ -155,6 +155,7 @@ let rollAttack = (rolls, data) => {
 };
 
 let clearActionEffects = (actor) => {
+  if (!game.user.isGM) return;
   const existingEffectIds = actor.effects
     .filter((e) => e.getFlag(MODULE_ID, 'actionType'))
     .filter((e) => (e.duration.startRound < game.combat.round)
@@ -164,8 +165,6 @@ let clearActionEffects = (actor) => {
 };
 
 let combatTurnChange = (combat) => {
-  if (!combat?.combatant?.isOwner) return;
-
   let actor = combat.combatant?.actor;
   if (!actor) return;
 
