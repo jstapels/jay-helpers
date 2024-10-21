@@ -43,6 +43,11 @@ const actionSetting = {
   reaction: SETTING_TRACK_REACTION,
 };
 
+const isActionEnabled = (actionType) => {
+  const settingId = actionSetting[actionType];
+  return game.settings.get(MODULE_ID, settingId);
+};
+
 const checkActionUsage = (actor, item, actionType) => {
   const existingEffect = actor.effects.find((e) => {
     const effectActionType = e.getFlag(MODULE_ID, 'actionType');
@@ -78,8 +83,6 @@ const createActionUsage = (actor, item, actionType) => {
     },
   };
   effectData.label += item.name;
-  // effectData.duration.startRound = game.combat?.round;
-  // effectData.duration.startTurn = game.combat?.turn;
   actor.createEmbeddedDocuments("ActiveEffect", [effectData]);
 };
 
@@ -99,6 +102,7 @@ let preUseActivity = (activity) => {
     return true;
   }
 
+  // Make sure the tracking is enabled.
   const settingId = actionSetting[actionType];
   if (!settingId || !game.settings.get(MODULE_ID, settingId)) {
     return true;
@@ -114,6 +118,7 @@ let preUseActivity = (activity) => {
 const applyActorSelfEffects = (actor, effects) => {
   // Apply associated effects.
   effects.forEach((effect) => {
+    log("Activate effect", effect);
     // Enable an existing effect on the target if it originated from this effect
     const existingEffect = actor.effects.find((e) => e.origin === origin.uuid);
     if (existingEffect) {
@@ -135,7 +140,7 @@ const applyActorSelfEffects = (actor, effects) => {
 };
 
 const postUseActivity = (activity) => {
-  log('Activity used');
+  log('Activity used', activity);
 
   const item = activity?.parent?.parent;
   const actor = item?.actor;
@@ -146,14 +151,17 @@ const postUseActivity = (activity) => {
 
   // Check for any self effects and apply them.
   const selfTarget = activity.target?.affects?.type === "self";
-  if (selfTarget && activity.effects) {
+  const selfRange = activity.range?.units === "self";
+  if ((selfTarget || selfRange) && activity.effects) {
+    log("Found self effects to apply");
     const effects = activity.effects.map((e) => e.effect);
     applyActorSelfEffects(actor, effects);
   }
 
-  // Apply action effect, if there's a config for it.
+  // Apply action effect, if there's a config for it and it's enabled.
   const actionType = activity.activation?.type;
-  if (actionConfig[actionType]) {
+  if (isActionEnabled(actionType)) {
+    log(`A tracked action ${actionType} was used`);
     createActionUsage(actor, item, actionType);
   }
 };
@@ -162,7 +170,6 @@ let preRollAttack = (config) => {
   const activity = config.subject;
   const item = activity?.parent?.parent;
   const actor = item?.actor;
-  // if (!actor?.isOwner) return true;
   if (!game.combat?.combatant) return true;
 
   const combatant = game.combat.getCombatantByActor(item.actor);
@@ -180,7 +187,6 @@ let rollAttack = (rolls, data) => {
   const activity = data.subject;
   const item = activity?.parent?.parent;
   const actor = item?.actor;
-  // if (!actor?.isOwner) return;
   if (!game.combat?.combatant) return;
 
   const combatant = game.combat.getCombatantByActor(item.actor);
