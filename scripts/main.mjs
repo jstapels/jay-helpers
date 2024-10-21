@@ -86,21 +86,15 @@ const createActionUsage = (actor, item, actionType) => {
 let preUseActivity = (activity) => {
   log('Checking activity', activity);
 
-  // Skip if combat isn't active.
-  if (!game.combat) return true;
-
-  // Only proceed if owner of token got this event.
   const item = activity?.parent?.parent;
   const actor = item?.actor;
-  // if (!actor?.isOwner) return true;
+  const combatant = game.combat?.getCombatantByActor(actor);
 
   // Make sure actor is IN the combat.
-  const combatant = game.combat.getCombatantByActor(actor);
   if (!combatant) return true;
 
-  const actionType = activity.activation?.type;
-
   // Make sure there's a config for it.
+  const actionType = activity.activation?.type;
   if (!actionConfig[actionType]) {
     return true;
   }
@@ -114,8 +108,54 @@ let preUseActivity = (activity) => {
     return false;
   }
 
-  createActionUsage(actor, item, actionType);
   return true;
+};
+
+const applyActorSelfEffects = (actor, effects) => {
+  // Apply associated effects.
+  effects.forEach((effect) => {
+    // Enable an existing effect on the target if it originated from this effect
+    const existingEffect = actor.effects.find((e) => e.origin === origin.uuid);
+    if (existingEffect) {
+      existingEffect.update({
+        ...effect.constructor.getInitialDuration(),
+        disabled: false,
+      });
+    } else {
+      // Otherwise, create a new effect on the target
+      const effectData = {
+        ...effect.toObject(),
+        disabled: false,
+        transfer: false,
+        origin: origin.uuid,
+      };
+      actor.createEmbeddedDocuments("ActiveEffect", [effectData]);
+    }
+  });
+};
+
+const postUseActivity = (activity) => {
+  log('Activity used');
+
+  const item = activity?.parent?.parent;
+  const actor = item?.actor;
+  const combatant = game.combat?.getCombatantByActor(actor);
+
+  // Make sure actor is IN the combat.
+  if (!combatant) return;
+
+  // Check for any self effects and apply them.
+  const selfTarget = activity.target?.affects?.type === "self";
+  if (selfTarget && activity.effects) {
+    const effects = activity.effects.map((e) => e.effect);
+    applyActorSelfEffects(actor, effects);
+  }
+
+  // Apply action effect, if there's a config for it.
+  const actionType = activity.activation?.type;
+  if (actionConfig[actionType]) {
+    createActionUsage(actor, item, actionType);
+  }
 };
 
 let preRollAttack = (config) => {
@@ -246,6 +286,7 @@ const readyHook = () => {
   log('Ready');
 
   Hooks.on('dnd5e.preUseActivity', preUseActivity);
+  Hooks.on('dnd5e.preUseActivity', postUseActivity);
   Hooks.on('dnd5e.preRollAttackV2', preRollAttack);
   Hooks.on('dnd5e.rollAttackV2', rollAttack);
   Hooks.on('combatTurnChange', combatTurnChange);
