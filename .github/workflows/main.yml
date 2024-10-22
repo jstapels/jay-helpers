@@ -44,5 +44,4 @@ jobs:
           artifacts: "./module.json, ./jay-helpers.zip"
           tag: "v${{ steps.json_extracter.outputs.version }}"
           commit: main
-          draft: true
-          body: ${{ github.event.head_commit.message }}
+          body: "${{ github.event.head_commit.message }}"
