@@ -16,6 +16,14 @@
             "trackOpportunity": {
                 "name": "Track opportunity attacks (as reaction)?",
                 "hint": "Treat off turn attacks as opportunity attacks, that use a reaction."
+            },
+            "applySelfEffects": {
+                "name": "Apply self effects?",
+                "hint": "Automatically apply effects from activities that target self?"
+            },
+            "preventIdentification": {
+                "name": "Prevent identification?",
+                "hint": "Prevent non-GM users from being able to identify items?"
             }
         }
     }

@@ -5,6 +5,8 @@ const SETTING_TRACK_ACTION = "trackAction";
 const SETTING_TRACK_BONUS = "trackBonus";
 const SETTING_TRACK_REACTION = "trackReaction";
 const SETTING_TRACK_OPPORTUNITY = "trackOpportunity";
+const SETTING_APPLY_SELF_EFFECTS = "applySelfEffects";
+const SETTING_PREVENT_IDENTIFICATION = "applySelfEffects";
 
 /**
  * Log to the console.
@@ -152,7 +154,8 @@ const postUseActivity = (activity) => {
   // Check for any self effects and apply them.
   const selfTarget = activity.target?.affects?.type === "self";
   const selfRange = activity.range?.units === "self";
-  if ((selfTarget || selfRange) && activity.effects) {
+  const applySelfEffects = game.settings.get(MODULE_ID, SETTING_APPLY_SELF_EFFECTS);
+  if ((selfTarget || selfRange) && activity.effects && applySelfEffects) {
     log("Found self effects to apply");
     const effects = activity.effects.map((e) => e.effect);
     applyActorSelfEffects(actor, effects);
@@ -220,6 +223,10 @@ let combatTurnChange = (combat) => {
 // Remove Identify button at top of Item Sheet
 const removeIdentifyButton = (sheet, [html]) => {
   if (game.user.isGM) return;
+
+  const preventIdentification = game.settings.get(MODULE_ID, SETTING_PREVENT_IDENTIFICATION);
+  if (!preventIdentification) return;
+
   const unidentified = sheet.item.system.identified === false;
   if (!unidentified) return;
   html.querySelectorAll(".pseudo-header-button.state-toggle.toggle-identified")
@@ -230,6 +237,10 @@ const removeIdentifyButton = (sheet, [html]) => {
 // Remove Identify button from Item Context menu on Actor Sheet
 const removeIdentifyMenu = (item, buttons) => {
   if (game.user.isGM) return;
+
+  const preventIdentification = game.settings.get(MODULE_ID, SETTING_PREVENT_IDENTIFICATION);
+  if (!preventIdentification) return;
+
   const unidentified = item.system.identified === false;
   if (!unidentified) return;
   const identifyIndex = buttons.findIndex((opt) => opt.name === 'DND5E.Identify');
@@ -249,7 +260,7 @@ const initHook = () => {
     hint: game.i18n.localize(`${MODULE_ID}.settings.trackAction.hint`),
     scope: 'client',
     config: true,
-    requiresReload: true,
+    requiresReload: false,
     type: Boolean,
     default: false,
   });
@@ -259,7 +270,7 @@ const initHook = () => {
     hint: game.i18n.localize(`${MODULE_ID}.settings.trackBonus.hint`),
     scope: 'client',
     config: true,
-    requiresReload: true,
+    requiresReload: false,
     type: Boolean,
     default: true,
   });
@@ -269,7 +280,7 @@ const initHook = () => {
     hint: game.i18n.localize(`${MODULE_ID}.settings.trackReaction.hint`),
     scope: 'client',
     config: true,
-    requiresReload: true,
+    requiresReload: false,
     type: Boolean,
     default: true,
   });
@@ -279,7 +290,27 @@ const initHook = () => {
     hint: game.i18n.localize(`${MODULE_ID}.settings.trackOpportunity.hint`),
     scope: 'client',
     config: true,
-    requiresReload: true,
+    requiresReload: false,
+    type: Boolean,
+    default: true,
+  });
+
+  game.settings.register(MODULE_ID, SETTING_APPLY_SELF_EFFECTS, {
+    name: game.i18n.localize(`${MODULE_ID}.settings.applySelfEffects.name`),
+    hint: game.i18n.localize(`${MODULE_ID}.settings.applySelfEffects.hint`),
+    scope: 'client',
+    config: true,
+    requiresReload: false,
+    type: Boolean,
+    default: true,
+  });
+
+  game.settings.register(MODULE_ID, SETTING_PREVENT_IDENTIFICATION, {
+    name: game.i18n.localize(`${MODULE_ID}.settings.preventIdentification.name`),
+    hint: game.i18n.localize(`${MODULE_ID}.settings.preventIdentification.hint`),
+    scope: 'world',
+    config: true,
+    requiresReload: false,
     type: Boolean,
     default: true,
   });
