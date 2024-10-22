@@ -28,12 +28,12 @@ jobs:
         env:
           url: https://github.com/${{github.repository}}
           manifest: https://github.com/${{github.repository}}/releases/latest/download/module.json
-          download: https://github.com/${{github.repository}}/releases/download/${{steps.json_extracter.outputs.version}}/${{github.repository}}.zip
+          download: https://github.com/${{github.repository}}/releases/download/${{steps.json_extracter.outputs.version}}/jay-helpers.zip
           changelog: https://github.com/${{github.repository}}/blob/main/CHANGELOG.md
           readme: https://github.com/${{github.repository}}/blob/main/README.md
 
       # Create a zip file with all files required by the module to add to the release
-      - run: zip -r ./${{github.repository}}.zip module.json LICENSE lang/ scripts/ images/
+      - run: zip -r ./jay-helpers.zip module.json LICENSE lang/ scripts/ images/
 
       # Create a release for this specific version
       - name: Update Release with Files
@@ -41,7 +41,7 @@ jobs:
         uses: ncipollo/release-action@v1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          artifacts: "./module.json, ./${{github.repository}}.zip"
+          artifacts: "./module.json, ./jay-helpers.zip"
           tag: ${{steps.json_extracter.outputs.version}}
           commit: main
           draft: true
