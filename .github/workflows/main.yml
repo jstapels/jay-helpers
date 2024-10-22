@@ -42,7 +42,7 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           artifacts: "./module.json, ./jay-helpers.zip"
-          tag: ${{steps.json_extracter.outputs.version}}
+          tag: "v${{steps.json_extracter.outputs.version}}"
           commit: main
           draft: true
           body: "Need changelog here"
