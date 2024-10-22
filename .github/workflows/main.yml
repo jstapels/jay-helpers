@@ -28,7 +28,7 @@ jobs:
         env:
           url: https://github.com/${{ github.repository }}
           manifest: https://github.com/${{ github.repository }}/releases/latest/download/module.json
-          download: https://github.com/${{ github.repository }}/releases/download/${{ steps.json_extracter.outputs.version }}/jay-helpers.zip
+          download: https://github.com/${{ github.repository }}/releases/download/v${{ steps.json_extracter.outputs.version }}/jay-helpers.zip
           changelog: https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md
           readme: https://github.com/${{ github.repository }}/blob/main/README.md
 
