@@ -2,7 +2,7 @@
   "id": "jay-helpers",
   "title": "Jay Helpers",
   "description": "Foundry VTT module that has Jason's little hacks.",
-  "version": "1.2.3",
+  "version": "1.2.2",
   "compatibility": {
     "minimum": "12",
     "verified": "12"
