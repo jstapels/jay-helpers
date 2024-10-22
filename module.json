@@ -1,7 +1,7 @@
 {
   "id": "jay-helpers",
   "title": "Jay Helpers",
-  "description": "Foundry VTT module with some things that Jason finds helpful.",
+  "description": "Foundry VTT module with some things that Jay finds helpful.",
   "version": "1.2.2",
   "compatibility": {
     "minimum": "12",
