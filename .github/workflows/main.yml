@@ -32,12 +32,6 @@ jobs:
           changelog: https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md
           readme: https://github.com/${{ github.repository }}/blob/main/README.md
 
-      - name: Generate commit messages
-        id: commit-messages
-        uses: tylermilner/commit-messages-between-commits-action@v1
-        with:
-          begin-sha: ${{ github.sha }}
-
       # Create a zip file with all files required by the module to add to the release
       - run: zip -r ./jay-helpers.zip module.json LICENSE lang/ scripts/ images/
 
@@ -51,4 +45,4 @@ jobs:
           tag: "v${{ steps.json_extracter.outputs.version }}"
           commit: main
           draft: true
-          body: ${{ steps.commit-messages.outputs }}
+          body: ${{ github.event.head_commit.message }}
