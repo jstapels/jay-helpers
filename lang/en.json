@@ -14,8 +14,8 @@
                 "hint": "Track when a token take a reaction."
             },
             "trackOpportunity": {
-                "name": "Track opportunity attacks (as reaction)?",
-                "hint": "Treat off turn attacks as opportunity attacks, that use a reaction."
+                "name": "Track opportunity attacks?",
+                "hint": "Treat off-turn attacks as opportunity attacks, that use a reaction."
             },
             "applySelfEffects": {
                 "name": "Apply self effects?",

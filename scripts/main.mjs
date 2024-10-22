@@ -6,7 +6,7 @@ const SETTING_TRACK_BONUS = "trackBonus";
 const SETTING_TRACK_REACTION = "trackReaction";
 const SETTING_TRACK_OPPORTUNITY = "trackOpportunity";
 const SETTING_APPLY_SELF_EFFECTS = "applySelfEffects";
-const SETTING_PREVENT_IDENTIFICATION = "applySelfEffects";
+const SETTING_PREVENT_IDENTIFICATION = "preventIdentification";
 
 /**
  * Log to the console.
