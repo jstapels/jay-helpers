@@ -328,8 +328,8 @@ const initHook = () => {
   });
 
   game.settings.register(MODULE_ID, SETTING_RED_BLOODIED, {
-    name: game.i18n.localize(`${MODULE_ID}.settings.redBlooded.name`),
-    hint: game.i18n.localize(`${MODULE_ID}.settings.redBlooded.hint`),
+    name: game.i18n.localize(`${MODULE_ID}.settings.redBloodied.name`),
+    hint: game.i18n.localize(`${MODULE_ID}.settings.redBloodied.hint`),
     scope: 'world',
     config: true,
     requiresReload: true,
@@ -338,8 +338,8 @@ const initHook = () => {
   });
 
   game.settings.register(MODULE_ID, SETTING_OVERLAY_BLOODIED, {
-    name: game.i18n.localize(`${MODULE_ID}.settings.overlayBlooded.name`),
-    hint: game.i18n.localize(`${MODULE_ID}.settings.overlayBlooded.hint`),
+    name: game.i18n.localize(`${MODULE_ID}.settings.overlayBloodied.name`),
+    hint: game.i18n.localize(`${MODULE_ID}.settings.overlayBloodied.hint`),
     scope: 'world',
     config: true,
     requiresReload: true,
