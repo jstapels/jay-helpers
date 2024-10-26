@@ -25,9 +25,13 @@
                 "name": "Prevent identification?",
                 "hint": "Prevent non-GM users from being able to identify items?"
             },
-            "biggerBloodied": {
-                "name": "Bigger bloodied?",
-                "hint": "Make the bloodied effect bigger and redder?"
+            "redBloodied": {
+                "name": "Red bloodied?",
+                "hint": "Make the bloodied effect red?"
+            },
+            "overlayBloodied": {
+                "name": "Overlay bloodied?",
+                "hint": "Make the bloodied effect overlay?"
             }
         }
     }

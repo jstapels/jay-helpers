@@ -7,7 +7,8 @@ const SETTING_TRACK_REACTION = "trackReaction";
 const SETTING_TRACK_OPPORTUNITY = "trackOpportunity";
 const SETTING_APPLY_SELF_EFFECTS = "applySelfEffects";
 const SETTING_PREVENT_IDENTIFICATION = "preventIdentification";
-const SETTING_BIGGER_BLOODIED = "biggerBloodied";
+const SETTING_RED_BLOODIED = "redBloodied";
+const SETTING_OVERLAY_BLOODIED = "overlayBloodied";
 
 /**
  * Log to the console.
@@ -247,13 +248,15 @@ const removeIdentifyMenu = (item, buttons) => {
 };
 
 const preCreateActiveEffect = (effect) => {
-  const bloodiedEnabled = game.settings.get(MODULE_ID, SETTING_BIGGER_BLOODIED);
+  const redBloodied = game.settings.get(MODULE_ID, SETTING_RED_BLOODIED);
+  const overlayBloodied = game.settings.get(MODULE_ID, SETTING_OVERLAY_BLOODIED);
+  const bloodiedEnabled = redBloodied || overlayBloodied;
   const bloodiedEffect = (effect._id === dnd5e.documents.ActiveEffect5e.ID.BLOODIED);
   if (bloodiedEffect && bloodiedEnabled) {
-    effect.updateSource({
-      tint: '#FF0000',
-      flags: { core: { overlay: true } },
-    });
+    const updates = {};
+    if (redBloodied) updates.tint = "#FF0000";
+    if (overlayBloodied) updates.flags = { overlay: true };
+    effect.updateSource(updates);
   }
 };
 
@@ -324,9 +327,19 @@ const initHook = () => {
     default: true,
   });
 
-  game.settings.register(MODULE_ID, SETTING_BIGGER_BLOODIED, {
-    name: game.i18n.localize(`${MODULE_ID}.settings.biggerBlooded.name`),
-    hint: game.i18n.localize(`${MODULE_ID}.settings.biggerBlooded.hint`),
+  game.settings.register(MODULE_ID, SETTING_RED_BLOODIED, {
+    name: game.i18n.localize(`${MODULE_ID}.settings.redBlooded.name`),
+    hint: game.i18n.localize(`${MODULE_ID}.settings.redBlooded.hint`),
+    scope: 'world',
+    config: true,
+    requiresReload: true,
+    type: Boolean,
+    default: true,
+  });
+
+  game.settings.register(MODULE_ID, SETTING_OVERLAY_BLOODIED, {
+    name: game.i18n.localize(`${MODULE_ID}.settings.overlayBlooded.name`),
+    hint: game.i18n.localize(`${MODULE_ID}.settings.overlayBlooded.hint`),
     scope: 'world',
     config: true,
     requiresReload: true,
