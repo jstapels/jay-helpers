@@ -7,6 +7,7 @@ const SETTING_TRACK_REACTION = "trackReaction";
 const SETTING_TRACK_OPPORTUNITY = "trackOpportunity";
 const SETTING_APPLY_SELF_EFFECTS = "applySelfEffects";
 const SETTING_PREVENT_IDENTIFICATION = "preventIdentification";
+const SETTING_BIGGER_BLOODIED = "biggerBloodied";
 
 /**
  * Log to the console.
@@ -110,11 +111,7 @@ let preUseActivity = (activity) => {
     return true;
   }
 
-  if (!checkActionUsage(actor, item, actionType)) {
-    return false;
-  }
-
-  return true;
+  return checkActionUsage(actor, item, actionType);
 };
 
 const applyActorSelfEffects = (actor, effects) => {
@@ -249,6 +246,18 @@ const removeIdentifyMenu = (item, buttons) => {
   }
 };
 
+const preCreateActiveEffect = (effect) => {
+  const bloodiedEnabled = game.settings.get(MODULE_ID, SETTING_BIGGER_BLOODIED);
+  const bloodiedEffect = (effect._id === dnd5e.documents.ActiveEffect5e.ID.BLOODIED);
+  if (bloodiedEffect && bloodiedEnabled) {
+    effect.updateSource({
+      tint: '#FF0000',
+      flags: { core: { overlay: true } },
+    });
+  }
+};
+
+
 /**
  * Called when Foundry has been initialized.
  */
@@ -314,6 +323,16 @@ const initHook = () => {
     type: Boolean,
     default: true,
   });
+
+  game.settings.register(MODULE_ID, SETTING_BIGGER_BLOODIED, {
+    name: game.i18n.localize(`${MODULE_ID}.settings.biggerBlooded.name`),
+    hint: game.i18n.localize(`${MODULE_ID}.settings.biggerBlooded.hint`),
+    scope: 'world',
+    config: true,
+    requiresReload: true,
+    type: Boolean,
+    default: true,
+  });
 };
 
 /**
@@ -329,6 +348,7 @@ const readyHook = () => {
   Hooks.on('combatTurnChange', combatTurnChange);
   Hooks.on("renderItemSheet5e2", removeIdentifyButton);
   Hooks.on("dnd5e.getItemContextOptions", removeIdentifyMenu);
+  Hooks.on("preCreateActiveEffect", preCreateActiveEffect);
 };
 
 Hooks.once('init', initHook);
