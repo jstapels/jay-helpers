@@ -1,14 +1,58 @@
 const MODULE_ID = 'jay-helpers';
 
 // Setting keys
-const SETTING_TRACK_ACTION = "trackAction";
-const SETTING_TRACK_BONUS = "trackBonus";
-const SETTING_TRACK_REACTION = "trackReaction";
-const SETTING_TRACK_OPPORTUNITY = "trackOpportunity";
-const SETTING_APPLY_SELF_EFFECTS = "applySelfEffects";
-const SETTING_PREVENT_IDENTIFICATION = "preventIdentification";
-const SETTING_RED_BLOODIED = "redBloodied";
-const SETTING_OVERLAY_BLOODIED = "overlayBloodied";
+const SETTINGS = {
+  TRACK_ACTION: {
+    id: "trackAction",
+    type: Boolean,
+    default: false,
+    scope: "client",
+  },
+  TRACK_BONUS: {
+    id: "trackBonus",
+    type: Boolean,
+    default: true,
+    scope: "client",
+  },
+  TRACK_REACTION: {
+    id: "trackReaction",
+    type: Boolean,
+    default: true,
+    scope: "client",
+  },
+  TRACK_OPPORTUNITY: {
+    id: "trackOpportunity",
+    type: Boolean,
+    default: true,
+    scope: "client",
+  },
+  APPLY_SELF_EFFECTS: {
+    id: "applySelfEffects",
+    type: Boolean,
+    default: true,
+    scope: "client",
+  },
+  PREVENT_IDENTIFICATION: {
+    id: "preventIdentification",
+    type: Boolean,
+    default: true,
+    scope: "world",
+  },
+  RED_BLOODIED: {
+    id: "redBloodied",
+    type: Boolean,
+    default: true,
+    scope: "world",
+    requiresReload: true,
+  },
+  OVERLAY_BLOODIED: {
+    id: "overlayBloodied",
+    type: Boolean,
+    default: true,
+    scope: "world",
+    requiresReload: true,
+  },
+};
 
 /**
  * Log to the console.
@@ -42,9 +86,9 @@ const actionConfig = {
 };
 
 const actionSetting = {
-  action: SETTING_TRACK_ACTION,
-  bonus: SETTING_TRACK_BONUS,
-  reaction: SETTING_TRACK_REACTION,
+  action: SETTINGS.TRACK_ACTION.id,
+  bonus: SETTINGS.TRACK_BONUS.id,
+  reaction: SETTINGS.TRACK_REACTION.id,
 };
 
 const isActionEnabled = (actionType) => {
@@ -152,7 +196,7 @@ const postUseActivity = (activity) => {
   // Check for any self effects and apply them.
   const selfTarget = activity.target?.affects?.type === "self";
   const selfRange = activity.range?.units === "self";
-  const applySelfEffects = game.settings.get(MODULE_ID, SETTING_APPLY_SELF_EFFECTS);
+  const applySelfEffects = game.settings.get(MODULE_ID, SETTINGS.APPLY_SELF_EFFECTS.id);
   if ((selfTarget || selfRange) && activity.effects && applySelfEffects) {
     log("Found self effects to apply");
     const effects = activity.effects.map((e) => e.effect);
@@ -194,7 +238,7 @@ let rollAttack = (rolls, data) => {
   if (!combatant) return;
 
   // If attacking and it's not your turn, assume an opportunity attack, use reaction.
-  const reactionEnable = game.settings.get(MODULE_ID, SETTING_TRACK_REACTION);
+  const reactionEnable = game.settings.get(MODULE_ID, SETTINGS.TRACK_REACTION.id);
   if (reactionEnable && game.combat.combatant.id !== combatant.id) {
     ui.notifications.info("You're attacking when it's not your turn, assuming an Opportunity Attack.");
     createActionUsage(actor, item, 'reaction');
@@ -222,7 +266,7 @@ let combatTurnChange = (combat) => {
 const removeIdentifyButton = (sheet, [html]) => {
   if (game.user.isGM) return;
 
-  const preventIdentification = game.settings.get(MODULE_ID, SETTING_PREVENT_IDENTIFICATION);
+  const preventIdentification = game.settings.get(MODULE_ID, SETTINGS.PREVENT_IDENTIFICATION.id);
   if (!preventIdentification) return;
 
   const unidentified = sheet.item.system.identified === false;
@@ -236,7 +280,7 @@ const removeIdentifyButton = (sheet, [html]) => {
 const removeIdentifyMenu = (item, buttons) => {
   if (game.user.isGM) return;
 
-  const preventIdentification = game.settings.get(MODULE_ID, SETTING_PREVENT_IDENTIFICATION);
+  const preventIdentification = game.settings.get(MODULE_ID, SETTINGS.PREVENT_IDENTIFICATION.id);
   if (!preventIdentification) return;
 
   const unidentified = item.system.identified === false;
@@ -248,14 +292,14 @@ const removeIdentifyMenu = (item, buttons) => {
 };
 
 const preCreateActiveEffect = (effect) => {
-  const redBloodied = game.settings.get(MODULE_ID, SETTING_RED_BLOODIED);
-  const overlayBloodied = game.settings.get(MODULE_ID, SETTING_OVERLAY_BLOODIED);
+  const redBloodied = game.settings.get(MODULE_ID, SETTINGS.RED_BLOODIED.id);
+  const overlayBloodied = game.settings.get(MODULE_ID, SETTINGS.OVERLAY_BLOODIED.id);
   const bloodiedEnabled = redBloodied || overlayBloodied;
   const bloodiedEffect = (effect._id === dnd5e.documents.ActiveEffect5e.ID.BLOODIED);
   if (bloodiedEffect && bloodiedEnabled) {
     const updates = {};
     if (redBloodied) updates.tint = "#FF0000";
-    if (overlayBloodied) updates.flags = { overlay: true };
+    if (overlayBloodied) updates.flags = { core: { overlay: true } };
     effect.updateSource(updates);
   }
 };
@@ -267,85 +311,20 @@ const preCreateActiveEffect = (effect) => {
 const initHook = () => {
   log('Initialize settings');
 
-  game.settings.register(MODULE_ID, SETTING_TRACK_ACTION, {
-    name: game.i18n.localize(`${MODULE_ID}.settings.trackAction.name`),
-    hint: game.i18n.localize(`${MODULE_ID}.settings.trackAction.hint`),
-    scope: 'client',
-    config: true,
-    requiresReload: false,
-    type: Boolean,
-    default: false,
-  });
+  Object.values(SETTINGS)
+    .forEach((s) => {
+      log('register', s);
+      game.settings.register(MODULE_ID, s.id, {
+        name: game.i18n.localize(`${MODULE_ID}.settings.${s.id}.name`),
+        hint: game.i18n.localize(`${MODULE_ID}.settings.${s.id}.hint`),
+        requiresReload: false,
+        config: true,
+        ...s,
+      });
+    });
 
-  game.settings.register(MODULE_ID, SETTING_TRACK_BONUS, {
-    name: game.i18n.localize(`${MODULE_ID}.settings.trackBonus.name`),
-    hint: game.i18n.localize(`${MODULE_ID}.settings.trackBonus.hint`),
-    scope: 'client',
-    config: true,
-    requiresReload: false,
-    type: Boolean,
-    default: true,
-  });
-
-  game.settings.register(MODULE_ID, SETTING_TRACK_REACTION, {
-    name: game.i18n.localize(`${MODULE_ID}.settings.trackReaction.name`),
-    hint: game.i18n.localize(`${MODULE_ID}.settings.trackReaction.hint`),
-    scope: 'client',
-    config: true,
-    requiresReload: false,
-    type: Boolean,
-    default: true,
-  });
-
-  game.settings.register(MODULE_ID, SETTING_TRACK_OPPORTUNITY, {
-    name: game.i18n.localize(`${MODULE_ID}.settings.trackOpportunity.name`),
-    hint: game.i18n.localize(`${MODULE_ID}.settings.trackOpportunity.hint`),
-    scope: 'client',
-    config: true,
-    requiresReload: false,
-    type: Boolean,
-    default: true,
-  });
-
-  game.settings.register(MODULE_ID, SETTING_APPLY_SELF_EFFECTS, {
-    name: game.i18n.localize(`${MODULE_ID}.settings.applySelfEffects.name`),
-    hint: game.i18n.localize(`${MODULE_ID}.settings.applySelfEffects.hint`),
-    scope: 'client',
-    config: true,
-    requiresReload: false,
-    type: Boolean,
-    default: true,
-  });
-
-  game.settings.register(MODULE_ID, SETTING_PREVENT_IDENTIFICATION, {
-    name: game.i18n.localize(`${MODULE_ID}.settings.preventIdentification.name`),
-    hint: game.i18n.localize(`${MODULE_ID}.settings.preventIdentification.hint`),
-    scope: 'world',
-    config: true,
-    requiresReload: false,
-    type: Boolean,
-    default: true,
-  });
-
-  game.settings.register(MODULE_ID, SETTING_RED_BLOODIED, {
-    name: game.i18n.localize(`${MODULE_ID}.settings.redBloodied.name`),
-    hint: game.i18n.localize(`${MODULE_ID}.settings.redBloodied.hint`),
-    scope: 'world',
-    config: true,
-    requiresReload: true,
-    type: Boolean,
-    default: true,
-  });
-
-  game.settings.register(MODULE_ID, SETTING_OVERLAY_BLOODIED, {
-    name: game.i18n.localize(`${MODULE_ID}.settings.overlayBloodied.name`),
-    hint: game.i18n.localize(`${MODULE_ID}.settings.overlayBloodied.hint`),
-    scope: 'world',
-    config: true,
-    requiresReload: true,
-    type: Boolean,
-    default: true,
-  });
+  // Update bloodied icon
+  CONFIG.DND5E.bloodied.icon = `modules/${MODULE_ID}/images/bleeding-wound.svg`;
 };
 
 /**
