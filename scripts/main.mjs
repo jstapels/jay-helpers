@@ -52,6 +52,18 @@ const SETTINGS = {
     scope: "world",
     requiresReload: true,
   },
+  SYNC_DEFEATED: {
+    id: "syncDefeated",
+    type: Boolean,
+    default: true,
+    scope: "world",
+  },
+  SYNC_UNCONSCIOUS: {
+    id: "syncUnconscious",
+    type: Boolean,
+    default: true,
+    scope: "world",
+  },
 };
 
 /**
@@ -89,6 +101,10 @@ const actionSetting = {
   action: SETTINGS.TRACK_ACTION.id,
   bonus: SETTINGS.TRACK_BONUS.id,
   reaction: SETTINGS.TRACK_REACTION.id,
+};
+
+const actorInCombat = (actor) => {
+  return game.combat?.getCombatantByActor(actor);
 };
 
 const isActionEnabled = (actionType) => {
@@ -139,10 +155,9 @@ let preUseActivity = (activity) => {
 
   const item = activity?.parent?.parent;
   const actor = item?.actor;
-  const combatant = game.combat?.getCombatantByActor(actor);
 
   // Make sure actor is IN the combat.
-  if (!combatant) return true;
+  if (!actorInCombat(actor)) return true;
 
   // Make sure there's a config for it.
   const actionType = activity.activation?.type;
@@ -188,10 +203,9 @@ const postUseActivity = (activity) => {
 
   const item = activity?.parent?.parent;
   const actor = item?.actor;
-  const combatant = game.combat?.getCombatantByActor(actor);
 
   // Make sure actor is IN the combat.
-  if (!combatant) return;
+  if (!actorInCombat(actor)) return;
 
   // Check for any self effects and apply them.
   const selfTarget = activity.target?.affects?.type === "self";
@@ -215,9 +229,8 @@ let preRollAttack = (config) => {
   const activity = config.subject;
   const item = activity?.parent?.parent;
   const actor = item?.actor;
-  if (!game.combat?.combatant) return true;
 
-  const combatant = game.combat.getCombatantByActor(item.actor);
+  const combatant = game.combat?.getCombatantByActor(item.actor);
   if (!combatant) return true;
 
   // If attacking and it's not owner's turn, assume an opportunity attack, check reaction.
@@ -232,9 +245,8 @@ let rollAttack = (rolls, data) => {
   const activity = data.subject;
   const item = activity?.parent?.parent;
   const actor = item?.actor;
-  if (!game.combat?.combatant) return;
 
-  const combatant = game.combat.getCombatantByActor(item.actor);
+  const combatant = game.combat?.getCombatantByActor(item.actor);
   if (!combatant) return;
 
   // If attacking and it's not your turn, assume an opportunity attack, use reaction.
@@ -304,6 +316,72 @@ const preCreateActiveEffect = (effect) => {
   }
 };
 
+const applyDamage = async (actor, damage, options) => {
+  log('applyDamage', actor, damage, options);
+
+  // Only track combatants
+  const combatant = game.combat?.getCombatantByActor(actor);
+  if (!combatant) return;
+
+  const applyUnconscious = game.settings.get(MODULE_ID, SETTINGS.SYNC_UNCONSCIOUS.id);
+  if (actor.type === 'character' && applyUnconscious) {
+    const unconsciousId = CONFIG.specialStatusEffects.UNCONSCIOUS;
+    const isDead = actor.system.attributes?.hp?.value === 0;
+    const isUnconscious = actor.statuses.has(unconsciousId);
+    if (isDead !== isUnconscious) {
+      await actor.toggleStatusEffect(unconsciousId);
+    }
+  }
+
+  if (!game.user.isGM) return;
+
+  const overlayBloodied = game.settings.get(MODULE_ID, SETTINGS.OVERLAY_BLOODIED.id);
+  const applyDefeated = game.settings.get(MODULE_ID, SETTINGS.SYNC_DEFEATED.id);
+  if (actor.type === 'npc' && applyDefeated) {
+    const isDead = actor.system.attributes?.hp?.value === 0;
+    const isDefeated = combatant.defeated;
+    log('Checking defeated', actor.name, isDead, isDefeated);
+    if (isDefeated !== isDead) {
+      const defeatedId = CONFIG.specialStatusEffects.DEFEATED;
+      await combatant.update({ defeated: isDead });
+      await actor.toggleStatusEffect(defeatedId, { overlay: true, active: isDead });
+      const bloodied = actor.effects.get(dnd5e.documents.ActiveEffect5e.ID.BLOODIED);
+      if (bloodied && overlayBloodied) {
+        bloodied.setFlag('core', { overlay: !isDead });
+      }
+    }
+  }
+};
+
+const applyTokenStatusEffect = async (token, status, state) => {
+  log('applyTokenStatusEffect', token, status, state);
+  if (!game.user.isGM) return;
+
+  const actor = token.actor;
+  if (!actor) return;
+
+  // Only track combatants
+  const combatant = game.combat?.getCombatantByActor(actor);
+  if (!combatant) return;
+
+  // Only track NPCs
+  if (actor.type !== 'npc') return;
+
+  const applyDefeated = game.settings.get(MODULE_ID, SETTINGS.SYNC_DEFEATED.id);
+  const overlayBloodied = game.settings.get(MODULE_ID, SETTINGS.OVERLAY_BLOODIED.id);
+  const isDefeatedStatus = status === CONFIG.specialStatusEffects.DEFEATED;
+  if (applyDefeated && isDefeatedStatus) {
+    const isDead = actor.system.attributes?.hp?.value === 0;
+    log('Confirming defeated', actor.name, isDead);
+    if (state !== isDead) {
+      actor.update({ 'system.attributes.hp': { value: state ? 0 : 1, temp: 0 } });
+      const bloodied = actor.effects.get(dnd5e.documents.ActiveEffect5e.ID.BLOODIED);
+      if (bloodied && overlayBloodied) {
+        bloodied.setFlag('core', { overlay: !isDead });
+      }
+    }
+  }
+};
 
 /**
  * Called when Foundry has been initialized.
@@ -341,6 +419,8 @@ const readyHook = () => {
   Hooks.on("renderItemSheet5e2", removeIdentifyButton);
   Hooks.on("dnd5e.getItemContextOptions", removeIdentifyMenu);
   Hooks.on("preCreateActiveEffect", preCreateActiveEffect);
+  Hooks.on('dnd5e.applyDamage', applyDamage);
+  Hooks.on("applyTokenStatusEffect", applyTokenStatusEffect);
 };
 
 Hooks.once('init', initHook);

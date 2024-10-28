@@ -32,6 +32,14 @@
             "overlayBloodied": {
                 "name": "Overlay bloodied?",
                 "hint": "Make the bloodied effect overlay?"
+            },
+            "syncDefeated": {
+                "name": "Sync defeated status?",
+                "hint": "Keep the defeated status synchronized with health of NPCs?"
+            },
+            "syncUnconscious": {
+                "name": "Sync unconscious status?",
+                "hint": "Keep the unconscious status synchronized with health of PCs?"
             }
         }
     }
