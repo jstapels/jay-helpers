@@ -21,6 +21,10 @@
                 "name": "Apply self effects?",
                 "hint": "Automatically apply effects from activities that target self?"
             },
+            "warnNoTarget": {
+                "name": "Warn when no targeted?",
+                "hint": "Warn the user when they use an action without a target?"
+            },
             "preventIdentification": {
                 "name": "Prevent identification?",
                 "hint": "Prevent non-GM users from being able to identify items?"

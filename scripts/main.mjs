@@ -32,6 +32,12 @@ const SETTINGS = {
     default: true,
     scope: "client",
   },
+  WARN_NO_TARGET: {
+    id: "warnNoTarget",
+    type: Boolean,
+    default: true,
+    scope: "client",
+  },
   PREVENT_IDENTIFICATION: {
     id: "preventIdentification",
     type: Boolean,
@@ -223,6 +229,15 @@ const postUseActivity = (activity) => {
     log(`A tracked action ${actionType} was used`);
     createActionUsage(actor, item, actionType);
   }
+
+  const warnNoTarget = game.settings.get(MODULE_ID, SETTINGS.WARN_NO_TARGET.id);
+  if (warnNoTarget) {
+    const target = game.user.targets?.size;
+    const attack = activity.type === 'attack';
+    if (attack && !target) {
+      ui.notifications.warn(`Don't forget to target an enemy.`);
+    }
+  }
 };
 
 let preRollAttack = (config) => {
@@ -412,7 +427,7 @@ const readyHook = () => {
   log('Ready');
 
   Hooks.on('dnd5e.preUseActivity', preUseActivity);
-  Hooks.on('dnd5e.preUseActivity', postUseActivity);
+  Hooks.on('dnd5e.postUseActivity', postUseActivity);
   Hooks.on('dnd5e.preRollAttackV2', preRollAttack);
   Hooks.on('dnd5e.rollAttackV2', rollAttack);
   Hooks.on('combatTurnChange', combatTurnChange);
