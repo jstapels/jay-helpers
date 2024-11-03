@@ -22,7 +22,7 @@
                 "hint": "Automatically apply effects from activities that target self?"
             },
             "warnNoTarget": {
-                "name": "Warn when no targeted?",
+                "name": "Warn when no target?",
                 "hint": "Warn the user when they use an action without a target?"
             },
             "preventIdentification": {
