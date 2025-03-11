@@ -340,8 +340,9 @@ const applyDamage = async (actor, damage, options) => {
   const combatant = game.combat?.getCombatantByActor(actor);
   if (!combatant) return;
 
+  const importantChar = actor.type === 'character' || (actor.type === 'npc' && actor.system.traits.important);
   const applyUnconscious = game.settings.get(MODULE_ID, SETTINGS.SYNC_UNCONSCIOUS.id);
-  if (actor.type === 'character' && applyUnconscious) {
+  if (importantChar && applyUnconscious) {
     const unconsciousId = CONFIG.specialStatusEffects.UNCONSCIOUS;
     const isDead = actor.system.attributes?.hp?.value === 0;
     const isUnconscious = actor.statuses.has(unconsciousId);
@@ -352,10 +353,10 @@ const applyDamage = async (actor, damage, options) => {
 
   if (!game.user.isGM) return;
 
+  const unimportantNpc = actor.type === 'npc' && !actor.system.traits.important;
   const overlayBloodied = game.settings.get(MODULE_ID, SETTINGS.OVERLAY_BLOODIED.id);
   const applyDefeated = game.settings.get(MODULE_ID, SETTINGS.SYNC_DEFEATED.id);
-  const important = actor.type !== 'npc' || actor.system.traits.important;
-  if (!important && applyDefeated) {
+  if (unimportant && applyDefeated) {
     const isDead = actor.system.attributes?.hp?.value === 0;
     const isDefeated = combatant.defeated;
     log('Checking defeated', actor.name, isDead, isDefeated);
