@@ -115,6 +115,7 @@ const actorInCombat = (actor) => {
 
 const isActionEnabled = (actionType) => {
   const settingId = actionSetting[actionType];
+  if (!settingId) return false;
   return game.settings.get(MODULE_ID, settingId);
 };
 
@@ -273,7 +274,8 @@ let rollAttack = (rolls, data) => {
 };
 
 let clearActionEffects = (actor) => {
-  if (!game.user.isGM) return;
+  if (game.user !== game.users.activeGM) return;
+
   const existingEffectIds = actor.effects
     .filter((e) => e.getFlag(MODULE_ID, 'actionType'))
     .filter((e) => (e.duration.startRound < game.combat.round)
@@ -352,7 +354,8 @@ const applyDamage = async (actor, damage, options) => {
 
   const overlayBloodied = game.settings.get(MODULE_ID, SETTINGS.OVERLAY_BLOODIED.id);
   const applyDefeated = game.settings.get(MODULE_ID, SETTINGS.SYNC_DEFEATED.id);
-  if (actor.type === 'npc' && applyDefeated) {
+  const important = actor.type !== 'npc' || actor.system.traits.important;
+  if (!important && applyDefeated) {
     const isDead = actor.system.attributes?.hp?.value === 0;
     const isDefeated = combatant.defeated;
     log('Checking defeated', actor.name, isDead, isDefeated);
