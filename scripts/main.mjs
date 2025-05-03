@@ -84,19 +84,19 @@ const log = (...args) => {
 
 const actionConfig = {
   action: {
-    label: 'Action - ',
+    name: 'Action - ',
     icon: `modules/${MODULE_ID}/images/action.svg`,
     description: 'Action taken',
     duration: { rounds: 1 },
   },
   bonus: {
-    label: 'Bonus Action: ',
+    name: 'Bonus Action: ',
     icon: `modules/${MODULE_ID}/images/bonus.svg`,
     description: 'Action taken',
     duration: { rounds: 1 },
   },
   reaction: {
-    label: 'Reaction: ',
+    name: 'Reaction: ',
     icon: `modules/${MODULE_ID}/images/reaction.svg`,
     description: 'Action taken',
     duration: { rounds: 1 },
@@ -132,7 +132,7 @@ const checkActionUsage = (actor, item, actionType) => {
 
   const warned = existingEffect.getFlag(MODULE_ID, 'warned');
   if (!warned) {
-    const usedItemName = existingEffect.name.replace(actionConfig[actionType].label, '');
+    const usedItemName = existingEffect.name.replace(actionConfig[actionType].name, '');
     ui.notifications.warn(`You already used your ${actionType} on ${usedItemName}, try again if you really want to use it.`);
     existingEffect.setFlag(MODULE_ID, 'warned', true);
     return false;
@@ -153,7 +153,7 @@ const createActionUsage = (actor, item, actionType) => {
       },
     },
   };
-  effectData.label += item.name;
+  effectData.name += item.name;
   actor.createEmbeddedDocuments("ActiveEffect", [effectData]);
 };
 
