@@ -2,10 +2,10 @@
   "id": "jay-helpers",
   "title": "Jay Helpers",
   "description": "Foundry VTT module with some things that Jay finds helpful.",
-  "version": "1.5.3",
+  "version": "1.5.4",
   "compatibility": {
     "minimum": "12",
-    "verified": "12"
+    "verified": "13"
   },
   "relationships": {
     "systems": [
