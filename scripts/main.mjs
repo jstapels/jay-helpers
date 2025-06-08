@@ -421,7 +421,7 @@ const initHook = () => {
     });
 
   // Update bloodied icon
-  CONFIG.DND5E.bloodied.icon = `modules/${MODULE_ID}/images/bleeding-wound.svg`;
+  CONFIG.DND5E.bloodied.img = `modules/${MODULE_ID}/images/bleeding-wound.svg`;
 };
 
 /**
