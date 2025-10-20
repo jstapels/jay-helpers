@@ -142,7 +142,21 @@ const checkActionUsage = (actor, item, actionType) => {
 };
 
 const createActionUsage = (actor, item, actionType) => {
-  // Create if no existing effect.
+  // Check if effect already exists
+  const existingEffect = actor.effects.find((e) => {
+    const effectActionType = e.getFlag(MODULE_ID, 'actionType');
+    return effectActionType === actionType;
+  });
+
+  if (existingEffect) {
+    // Update existing effect with new item name and reset warned flag
+    log(`Action effect for ${actionType} already exists, updating with new item`);
+    const newName = actionConfig[actionType].name + item.name;
+    existingEffect.update({ name: newName });
+    return;
+  }
+
+  // Create new action effect
   const effectData = {
     ...actionConfig[actionType],
     origin: actor,
@@ -181,7 +195,7 @@ let preUseActivity = (activity) => {
   return checkActionUsage(actor, item, actionType);
 };
 
-const applyActorSelfEffects = (actor, effects) => {
+const applyActorSelfEffects = (actor, effects, origin) => {
   // Apply associated effects.
   effects.forEach((effect) => {
     log("Activate effect", effect);
@@ -221,7 +235,7 @@ const postUseActivity = (activity) => {
   if ((selfTarget || selfRange) && activity.effects && applySelfEffects) {
     log("Found self effects to apply");
     const effects = activity.effects.map((e) => e.effect);
-    applyActorSelfEffects(actor, effects);
+    applyActorSelfEffects(actor, effects, item);
   }
 
   // Apply action effect, if there's a config for it and it's enabled.
@@ -291,6 +305,26 @@ let combatTurnChange = (combat) => {
   clearActionEffects(actor);
 };
 
+let combatEnd = (combat) => {
+  if (game.user !== game.users.activeGM) return;
+
+  log('Combat ended, clearing all action effects');
+
+  // Clear action effects from all combatants
+  combat.combatants.forEach((combatant) => {
+    const actor = combatant.actor;
+    if (!actor) return;
+
+    const existingEffectIds = actor.effects
+      .filter((e) => e.getFlag(MODULE_ID, 'actionType'))
+      .map((e) => e.id);
+
+    if (existingEffectIds.length > 0) {
+      actor.deleteEmbeddedDocuments('ActiveEffect', existingEffectIds);
+    }
+  });
+};
+
 // Remove Identify button at top of Item Sheet
 const removeIdentifyButton = (sheet, [html]) => {
   if (game.user.isGM) return;
@@ -328,7 +362,9 @@ const preCreateActiveEffect = (effect) => {
   if (bloodiedEffect && bloodiedEnabled) {
     const updates = {};
     if (redBloodied) updates.tint = "#FF0000";
-    if (overlayBloodied) updates.flags = { core: { overlay: true } };
+    if (overlayBloodied) {
+      updates['flags.core.overlay'] = true;
+    }
     effect.updateSource(updates);
   }
 };
@@ -366,7 +402,7 @@ const applyDamage = async (actor, damage, options) => {
       await actor.toggleStatusEffect(defeatedId, { overlay: true, active: isDead });
       const bloodied = actor.effects.get(dnd5e.documents.ActiveEffect5e.ID.BLOODIED);
       if (bloodied && overlayBloodied) {
-        bloodied.setFlag('core', { overlay: !isDead });
+        await bloodied.setFlag('core', 'overlay', !isDead);
       }
     }
   }
@@ -393,10 +429,10 @@ const applyTokenStatusEffect = async (token, status, state) => {
     const isDead = actor.system.attributes?.hp?.value === 0;
     log('Confirming defeated', actor.name, isDead);
     if (state !== isDead) {
-      actor.update({ 'system.attributes.hp': { value: state ? 0 : 1, temp: 0 } });
+      await actor.update({ 'system.attributes.hp': { value: state ? 0 : 1, temp: 0 } });
       const bloodied = actor.effects.get(dnd5e.documents.ActiveEffect5e.ID.BLOODIED);
       if (bloodied && overlayBloodied) {
-        bloodied.setFlag('core', { overlay: !isDead });
+        await bloodied.setFlag('core', 'overlay', !isDead);
       }
     }
   }
@@ -414,7 +450,6 @@ const initHook = () => {
       game.settings.register(MODULE_ID, s.id, {
         name: game.i18n.localize(`${MODULE_ID}.settings.${s.id}.name`),
         hint: game.i18n.localize(`${MODULE_ID}.settings.${s.id}.hint`),
-        requiresReload: false,
         config: true,
         ...s,
       });
@@ -435,6 +470,7 @@ const readyHook = () => {
   Hooks.on('dnd5e.preRollAttackV2', preRollAttack);
   Hooks.on('dnd5e.rollAttackV2', rollAttack);
   Hooks.on('combatTurnChange', combatTurnChange);
+  Hooks.on('deleteCombat', combatEnd);
   Hooks.on("renderItemSheet5e2", removeIdentifyButton);
   Hooks.on("dnd5e.getItemContextOptions", removeIdentifyMenu);
   Hooks.on("preCreateActiveEffect", preCreateActiveEffect);
