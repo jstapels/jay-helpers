@@ -119,7 +119,7 @@ const isActionEnabled = (actionType) => {
   return game.settings.get(MODULE_ID, settingId);
 };
 
-const checkActionUsage = (actor, item, actionType) => {
+const checkActionUsage = async (actor, item, actionType) => {
   const existingEffect = actor.effects.find((e) => {
     const effectActionType = e.getFlag(MODULE_ID, 'actionType');
     return effectActionType === actionType;
@@ -134,14 +134,14 @@ const checkActionUsage = (actor, item, actionType) => {
   if (!warned) {
     const usedItemName = existingEffect.name.replace(actionConfig[actionType].name, '');
     ui.notifications.warn(`You already used your ${actionType} on ${usedItemName}, try again if you really want to use it.`);
-    existingEffect.setFlag(MODULE_ID, 'warned', true);
+    await existingEffect.setFlag(MODULE_ID, 'warned', true);
     return false;
   }
-    
+
   return true;
 };
 
-const createActionUsage = (actor, item, actionType) => {
+const createActionUsage = async (actor, item, actionType) => {
   // Check if effect already exists
   const existingEffect = actor.effects.find((e) => {
     const effectActionType = e.getFlag(MODULE_ID, 'actionType');
@@ -152,7 +152,7 @@ const createActionUsage = (actor, item, actionType) => {
     // Update existing effect with new item name and reset warned flag
     log(`Action effect for ${actionType} already exists, updating with new item`);
     const newName = actionConfig[actionType].name + item.name;
-    existingEffect.update({ name: newName });
+    await existingEffect.update({ name: newName });
     return;
   }
 
@@ -168,10 +168,10 @@ const createActionUsage = (actor, item, actionType) => {
     },
   };
   effectData.name += item.name;
-  actor.createEmbeddedDocuments("ActiveEffect", [effectData]);
+  await actor.createEmbeddedDocuments("ActiveEffect", [effectData]);
 };
 
-let preUseActivity = (activity) => {
+let preUseActivity = async (activity) => {
   log('Checking activity', activity);
 
   const item = activity?.parent?.parent;
@@ -192,17 +192,17 @@ let preUseActivity = (activity) => {
     return true;
   }
 
-  return checkActionUsage(actor, item, actionType);
+  return await checkActionUsage(actor, item, actionType);
 };
 
-const applyActorSelfEffects = (actor, effects, origin) => {
+const applyActorSelfEffects = async (actor, effects, origin) => {
   // Apply associated effects.
-  effects.forEach((effect) => {
+  for (const effect of effects) {
     log("Activate effect", effect);
     // Enable an existing effect on the target if it originated from this effect
     const existingEffect = actor.effects.find((e) => e.origin === origin.uuid);
     if (existingEffect) {
-      existingEffect.update({
+      await existingEffect.update({
         ...effect.constructor.getInitialDuration(),
         disabled: false,
       });
@@ -214,12 +214,12 @@ const applyActorSelfEffects = (actor, effects, origin) => {
         transfer: false,
         origin: origin.uuid,
       };
-      actor.createEmbeddedDocuments("ActiveEffect", [effectData]);
+      await actor.createEmbeddedDocuments("ActiveEffect", [effectData]);
     }
-  });
+  }
 };
 
-const postUseActivity = (activity) => {
+const postUseActivity = async (activity) => {
   log('Activity used', activity);
 
   const item = activity?.parent?.parent;
@@ -235,14 +235,14 @@ const postUseActivity = (activity) => {
   if ((selfTarget || selfRange) && activity.effects && applySelfEffects) {
     log("Found self effects to apply");
     const effects = activity.effects.map((e) => e.effect);
-    applyActorSelfEffects(actor, effects, item);
+    await applyActorSelfEffects(actor, effects, item);
   }
 
   // Apply action effect, if there's a config for it and it's enabled.
   const actionType = activity.activation?.type;
   if (isActionEnabled(actionType)) {
     log(`A tracked action ${actionType} was used`);
-    createActionUsage(actor, item, actionType);
+    await createActionUsage(actor, item, actionType);
   }
 
   const warnNoTarget = game.settings.get(MODULE_ID, SETTINGS.WARN_NO_TARGET.id);
@@ -255,7 +255,7 @@ const postUseActivity = (activity) => {
   }
 };
 
-let preRollAttack = (config) => {
+let preRollAttack = async (config) => {
   const activity = config.subject;
   const item = activity?.parent?.parent;
   const actor = item?.actor;
@@ -265,13 +265,13 @@ let preRollAttack = (config) => {
 
   // If attacking and it's not owner's turn, assume an opportunity attack, check reaction.
   if (game.combat.combatant.id !== combatant.id) {
-    return checkActionUsage(actor, item, 'reaction');
+    return await checkActionUsage(actor, item, 'reaction');
   }
 
   return true;
 };
 
-let rollAttack = (rolls, data) => {
+let rollAttack = async (rolls, data) => {
   const activity = data.subject;
   const item = activity?.parent?.parent;
   const actor = item?.actor;
@@ -283,11 +283,11 @@ let rollAttack = (rolls, data) => {
   const reactionEnable = game.settings.get(MODULE_ID, SETTINGS.TRACK_REACTION.id);
   if (reactionEnable && game.combat.combatant.id !== combatant.id) {
     ui.notifications.info("You're attacking when it's not your turn, assuming an Opportunity Attack.");
-    createActionUsage(actor, item, 'reaction');
+    await createActionUsage(actor, item, 'reaction');
   }
 };
 
-let clearActionEffects = (actor) => {
+let clearActionEffects = async (actor) => {
   if (game.user !== game.users.activeGM) return;
 
   const existingEffectIds = actor.effects
@@ -295,34 +295,37 @@ let clearActionEffects = (actor) => {
     .filter((e) => (e.duration.startRound < game.combat.round)
       || (e.duration.startRound === game.combat.round && e.duration.startTurn < game.combat.turn))
     .map((e) => e.id);
-  actor.deleteEmbeddedDocuments('ActiveEffect', existingEffectIds);
+
+  if (existingEffectIds.length > 0) {
+    await actor.deleteEmbeddedDocuments('ActiveEffect', existingEffectIds);
+  }
 };
 
-let combatTurnChange = (combat) => {
+let combatTurnChange = async (combat) => {
   let actor = combat.combatant?.actor;
   if (!actor) return;
 
-  clearActionEffects(actor);
+  await clearActionEffects(actor);
 };
 
-let combatEnd = (combat) => {
+let combatEnd = async (combat) => {
   if (game.user !== game.users.activeGM) return;
 
   log('Combat ended, clearing all action effects');
 
   // Clear action effects from all combatants
-  combat.combatants.forEach((combatant) => {
+  for (const combatant of combat.combatants) {
     const actor = combatant.actor;
-    if (!actor) return;
+    if (!actor) continue;
 
     const existingEffectIds = actor.effects
       .filter((e) => e.getFlag(MODULE_ID, 'actionType'))
       .map((e) => e.id);
 
     if (existingEffectIds.length > 0) {
-      actor.deleteEmbeddedDocuments('ActiveEffect', existingEffectIds);
+      await actor.deleteEmbeddedDocuments('ActiveEffect', existingEffectIds);
     }
-  });
+  }
 };
 
 // Remove Identify button at top of Item Sheet
