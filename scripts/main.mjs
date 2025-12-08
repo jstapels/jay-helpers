@@ -263,6 +263,9 @@ let preRollAttack = async (config) => {
   const combatant = game.combat?.getCombatantByActor(item.actor);
   if (!combatant) return true;
 
+  // Legendary actions don't consume reactions.
+  if (activity.activation?.type === 'legendary') return true;
+
   // If attacking and it's not owner's turn, assume an opportunity attack, check reaction.
   if (game.combat.combatant.id !== combatant.id) {
     return await checkActionUsage(actor, item, 'reaction');
@@ -278,6 +281,9 @@ let rollAttack = async (rolls, data) => {
 
   const combatant = game.combat?.getCombatantByActor(item.actor);
   if (!combatant) return;
+
+  // Legendary actions don't consume reactions.
+  if (activity.activation?.type === 'legendary') return;
 
   // If attacking and it's not your turn, assume an opportunity attack, use reaction.
   const reactionEnable = game.settings.get(MODULE_ID, SETTINGS.TRACK_REACTION.id);
