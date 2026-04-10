@@ -109,6 +109,15 @@ const actionSetting = {
   reaction: SETTINGS.TRACK_REACTION.id,
 };
 
+const getActionEffect = (actor, actionType, { includeDisabled = false } = {}) => {
+  return actor.effects.find((effect) => {
+    const effectActionType = effect.getFlag(MODULE_ID, 'actionType');
+    if (effectActionType !== actionType) return false;
+    if (!includeDisabled && effect.disabled) return false;
+    return true;
+  });
+};
+
 const actorInCombat = (actor) => {
   return game.combat?.getCombatantByActor(actor);
 };
@@ -120,10 +129,7 @@ const isActionEnabled = (actionType) => {
 };
 
 const checkActionUsage = async (actor, item, actionType) => {
-  const existingEffect = actor.effects.find((e) => {
-    const effectActionType = e.getFlag(MODULE_ID, 'actionType');
-    return effectActionType === actionType;
-  });
+  const existingEffect = getActionEffect(actor, actionType);
 
   // Create if no existing effect.
   if (!existingEffect) {
@@ -143,10 +149,7 @@ const checkActionUsage = async (actor, item, actionType) => {
 
 const createActionUsage = async (actor, item, actionType) => {
   // Check if effect already exists
-  const existingEffect = actor.effects.find((e) => {
-    const effectActionType = e.getFlag(MODULE_ID, 'actionType');
-    return effectActionType === actionType;
-  });
+  const existingEffect = getActionEffect(actor, actionType);
 
   if (existingEffect) {
     // Update existing effect with new item name and reset warned flag
@@ -159,7 +162,7 @@ const createActionUsage = async (actor, item, actionType) => {
   // Create new action effect
   const effectData = {
     ...actionConfig[actionType],
-    origin: actor,
+    origin: actor.uuid,
     flags: {
       [MODULE_ID]: {
         actionType,
@@ -192,7 +195,7 @@ let preUseActivity = async (activity) => {
     return true;
   }
 
-  return await checkActionUsage(actor, item, actionType);
+  return checkActionUsage(actor, item, actionType);
 };
 
 const applyActorSelfEffects = async (actor, effects, origin) => {
@@ -256,6 +259,9 @@ const postUseActivity = async (activity) => {
 };
 
 let preRollAttack = async (config) => {
+  const trackOpportunity = game.settings.get(MODULE_ID, SETTINGS.TRACK_OPPORTUNITY.id);
+  if (!trackOpportunity) return true;
+
   const activity = config.subject;
   const item = activity?.parent?.parent;
   const actor = item?.actor;
@@ -268,13 +274,16 @@ let preRollAttack = async (config) => {
 
   // If attacking and it's not owner's turn, assume an opportunity attack, check reaction.
   if (game.combat.combatant.id !== combatant.id) {
-    return await checkActionUsage(actor, item, 'reaction');
+    return checkActionUsage(actor, item, 'reaction');
   }
 
   return true;
 };
 
 let rollAttack = async (rolls, data) => {
+  const trackOpportunity = game.settings.get(MODULE_ID, SETTINGS.TRACK_OPPORTUNITY.id);
+  if (!trackOpportunity) return;
+
   const activity = data.subject;
   const item = activity?.parent?.parent;
   const actor = item?.actor;
@@ -290,47 +299,6 @@ let rollAttack = async (rolls, data) => {
   if (reactionEnable && game.combat.combatant.id !== combatant.id) {
     ui.notifications.info("You're attacking when it's not your turn, assuming an Opportunity Attack.");
     await createActionUsage(actor, item, 'reaction');
-  }
-};
-
-let clearActionEffects = async (actor) => {
-  if (game.user !== game.users.activeGM) return;
-
-  const existingEffectIds = actor.effects
-    .filter((e) => e.getFlag(MODULE_ID, 'actionType'))
-    .filter((e) => (e.duration.startRound < game.combat.round)
-      || (e.duration.startRound === game.combat.round && e.duration.startTurn < game.combat.turn))
-    .map((e) => e.id);
-
-  if (existingEffectIds.length > 0) {
-    await actor.deleteEmbeddedDocuments('ActiveEffect', existingEffectIds);
-  }
-};
-
-let combatTurnChange = async (combat) => {
-  let actor = combat.combatant?.actor;
-  if (!actor) return;
-
-  await clearActionEffects(actor);
-};
-
-let combatEnd = async (combat) => {
-  if (game.user !== game.users.activeGM) return;
-
-  log('Combat ended, clearing all action effects');
-
-  // Clear action effects from all combatants
-  for (const combatant of combat.combatants) {
-    const actor = combatant.actor;
-    if (!actor) continue;
-
-    const existingEffectIds = actor.effects
-      .filter((e) => e.getFlag(MODULE_ID, 'actionType'))
-      .map((e) => e.id);
-
-    if (existingEffectIds.length > 0) {
-      await actor.deleteEmbeddedDocuments('ActiveEffect', existingEffectIds);
-    }
   }
 };
 
@@ -358,7 +326,7 @@ const removeIdentifyMenu = (item, buttons) => {
   const unidentified = item.system.identified === false;
   if (!unidentified) return;
   const identifyIndex = buttons.findIndex((opt) => opt.name === 'DND5E.Identify');
-  if (identifyIndex) {
+  if (identifyIndex >= 0) {
     buttons.splice(identifyIndex, 1);
   }
 };
@@ -478,8 +446,6 @@ const readyHook = () => {
   Hooks.on('dnd5e.postUseActivity', postUseActivity);
   Hooks.on('dnd5e.preRollAttackV2', preRollAttack);
   Hooks.on('dnd5e.rollAttackV2', rollAttack);
-  Hooks.on('combatTurnChange', combatTurnChange);
-  Hooks.on('deleteCombat', combatEnd);
   Hooks.on("renderItemSheet5e2", removeIdentifyButton);
   Hooks.on("dnd5e.getItemContextOptions", removeIdentifyMenu);
   Hooks.on("preCreateActiveEffect", preCreateActiveEffect);
@@ -489,4 +455,3 @@ const readyHook = () => {
 
 Hooks.once('init', initHook);
 Hooks.once('ready', readyHook);
-
