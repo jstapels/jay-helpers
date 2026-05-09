@@ -596,6 +596,14 @@ const captureDealtCardDetails = (origin, destinations, context) => {
   });
 };
 
+const capturePassedCardDetails = (origin, destination, context) => {
+  const enabled = game.settings.get(MODULE_ID, SETTINGS.SHOW_CARD_PLAY_DETAILS.id);
+  if (!enabled) return;
+
+  const cards = normalizeCardCreateOperation(context.toCreate ?? context.toUpdate ?? []);
+  registerPendingCardChatDetails(destination, cards, context.action);
+};
+
 const consumePendingCardChatDetails = (destinationUuids) => {
   const now = Date.now();
   for (const destinationUuid of destinationUuids) {
@@ -642,14 +650,19 @@ const enrichCardChatMessage = async (message, html) => {
   const contentNode = html.querySelector(".message-content");
   if (!contentNode) return;
 
-  const renderCardLink = (detail) => {
-    const cardLink = document.createElement("a");
+  const renderCardButton = (detail) => {
+    const cardLink = document.createElement("button");
     cardLink.classList.add("jay-helpers-card-link");
-    cardLink.href = "#";
+    cardLink.type = "button";
     cardLink.title = game.i18n.localize("JOURNAL.ActionShow");
+    cardLink.style.background = "none";
+    cardLink.style.border = "0";
+    cardLink.style.cursor = "pointer";
+    cardLink.style.padding = "0";
     cardLink.innerHTML = `<img src="${detail.image}" alt="${detail.name}" style="width: 48px; height: 48px; object-fit: cover; border: 0;"/>`;
     cardLink.addEventListener("click", (event) => {
       event.preventDefault();
+      event.stopPropagation();
       const popout = new ImagePopout({
         src: detail.image,
         uuid: detail.uuid,
@@ -685,7 +698,7 @@ const enrichCardChatMessage = async (message, html) => {
     wrapper.style.display = "flex";
     wrapper.style.gap = "0.5rem";
     wrapper.style.alignItems = "flex-start";
-    wrapper.append(renderCardLink(detail), await renderCardDetails(detail));
+    wrapper.append(renderCardButton(detail), await renderCardDetails(detail));
     return wrapper;
   };
 
@@ -748,6 +761,7 @@ const readyHook = () => {
   Hooks.on('dnd5e.applyDamage', applyDamage);
   Hooks.on("applyTokenStatusEffect", applyTokenStatusEffect);
   Hooks.on("dealCards", captureDealtCardDetails);
+  Hooks.on("passCards", capturePassedCardDetails);
   Hooks.on("preCreateChatMessage", addCardDetailsToChatMessage);
   Hooks.on("renderChatMessageHTML", enrichCardChatMessage);
 };
