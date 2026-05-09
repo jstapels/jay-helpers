@@ -657,9 +657,28 @@ const enrichCardChatMessage = async (message, html) => {
     cardLink.title = game.i18n.localize("JOURNAL.ActionShow");
     cardLink.style.background = "none";
     cardLink.style.border = "0";
+    cardLink.style.boxSizing = "border-box";
     cardLink.style.cursor = "pointer";
+    cardLink.style.display = "flex";
+    cardLink.style.flex = "0 0 48px";
+    cardLink.style.height = "48px";
+    cardLink.style.lineHeight = "0";
+    cardLink.style.overflow = "hidden";
     cardLink.style.padding = "0";
-    cardLink.innerHTML = `<img src="${detail.image}" alt="${detail.name}" style="width: 48px; height: 48px; object-fit: cover; border: 0;"/>`;
+    cardLink.style.width = "48px";
+
+    const image = document.createElement("img");
+    image.src = detail.image;
+    image.alt = detail.name;
+    image.style.border = "0";
+    image.style.display = "block";
+    image.style.height = "100%";
+    image.style.maxHeight = "none";
+    image.style.maxWidth = "none";
+    image.style.objectFit = "cover";
+    image.style.width = "100%";
+    cardLink.append(image);
+
     cardLink.addEventListener("click", (event) => {
       event.preventDefault();
       event.stopPropagation();
@@ -717,6 +736,7 @@ const enrichCardChatMessage = async (message, html) => {
   detailsWrapper.style.display = "flex";
   detailsWrapper.style.flexDirection = "column";
   detailsWrapper.style.gap = "0.5rem";
+  detailsWrapper.style.marginTop = "0.5rem";
   for (const detail of detailsToRender) {
     detailsWrapper.append(await renderCard(detail));
   }
