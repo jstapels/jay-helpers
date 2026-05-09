@@ -429,39 +429,79 @@ const getMessageFlag = (message, scope, key) => {
   }
 };
 
-const getChatCardFromMessage = (message) => {
-  const cardUuid = getMessageFlag(message, "core", "cardUuid")
-    ?? getMessageFlag(message, "cards", "cardUuid")
-    ?? getMessageFlag(message, "core", "sourceUuid");
-
-  if (cardUuid) return fromUuidSync(cardUuid);
-
-  const deck = game.cards?.get(message.speaker?.scene);
-  if (!deck) return null;
-  const cardId = getMessageFlag(message, "cards", "cardId");
-  if (cardId) return deck.cards.get(cardId);
-
+const getCardFromUuid = (uuid) => {
+  if (!uuid) return null;
+  try {
+    const document = fromUuidSync(uuid);
+    if (document?.documentName === "Card") return document;
+  } catch {
+    return null;
+  }
   return null;
 };
 
-const isCardMessageFaceUp = (message) => {
-  const faceUpFlag = getMessageFlag(message, "cards", "faceUp")
+const getChatCardUuidFromHtml = (html) => {
+  const uuidNode = html.querySelector("[data-uuid*='.Card.'], [data-document-uuid*='.Card.']");
+  return uuidNode?.dataset.uuid ?? uuidNode?.dataset.documentUuid ?? null;
+};
+
+const findCardById = (cardId) => {
+  if (!cardId) return null;
+  for (const cards of game.cards ?? []) {
+    const card = cards.cards?.get(cardId);
+    if (card) return card;
+  }
+  return null;
+};
+
+const getChatCardFromMessage = (message, html) => {
+  const cardUuid = getMessageFlag(message, "core", "cardUuid")
+    ?? getMessageFlag(message, "cards", "cardUuid")
+    ?? getMessageFlag(message, "core", "sourceUuid")
+    ?? getMessageFlag(message, "core", "sourceId")
+    ?? getChatCardUuidFromHtml(html);
+
+  const cardFromUuid = getCardFromUuid(cardUuid);
+  if (cardFromUuid) return cardFromUuid;
+
+  const cardId = getMessageFlag(message, "cards", "cardId");
+  return findCardById(cardId);
+};
+
+const getCardFaceUpFlag = (message) => {
+  return getMessageFlag(message, "cards", "faceUp")
     ?? getMessageFlag(message, "core", "faceUp")
-    ?? getMessageFlag(message, "cards", "isFaceUp");
+    ?? getMessageFlag(message, "cards", "isFaceUp")
+    ?? message.flags?.cards?.card?.faceUp
+    ?? message.flags?.cards?.cardData?.faceUp;
+};
+
+const getCardFaceDownFlag = (message) => {
+  return getMessageFlag(message, "cards", "facedown")
+    ?? getMessageFlag(message, "core", "facedown")
+    ?? getMessageFlag(message, "cards", "isFaceDown")
+    ?? message.flags?.cards?.card?.facedown
+    ?? message.flags?.cards?.cardData?.facedown;
+};
+
+const isCardMessageFaceUp = (message, card) => {
+  if (typeof card?.showFace === "boolean") return card.showFace;
+
+  const faceUpFlag = getCardFaceUpFlag(message);
   if (typeof faceUpFlag === "boolean") return faceUpFlag;
 
-  const facedownFlag = getMessageFlag(message, "cards", "facedown")
-    ?? getMessageFlag(message, "core", "facedown")
-    ?? getMessageFlag(message, "cards", "isFaceDown");
+  const facedownFlag = getCardFaceDownFlag(message);
   if (typeof facedownFlag === "boolean") return !facedownFlag;
 
-  const cardFlags = message.flags?.cards;
-  const nestedFaceUp = cardFlags?.card?.faceUp ?? cardFlags?.cardData?.faceUp;
-  if (typeof nestedFaceUp === "boolean") return nestedFaceUp;
-  const nestedFaceDown = cardFlags?.card?.facedown ?? cardFlags?.cardData?.facedown;
-  if (typeof nestedFaceDown === "boolean") return !nestedFaceDown;
-
   return false;
+};
+
+const getCardImage = (card) => {
+  return card?.img ?? card?.currentFace?.img ?? card?.faces?.[card.face]?.img ?? null;
+};
+
+const getCardDescription = (card) => {
+  return card?.currentFace?.description ?? card?.description ?? "";
 };
 
 const getCardLabel = (value) => {
@@ -474,9 +514,10 @@ const enrichCardChatMessage = async (message, html) => {
   const enabled = game.settings.get(MODULE_ID, SETTINGS.SHOW_CARD_PLAY_DETAILS.id);
   if (!enabled) return;
 
-  const card = getChatCardFromMessage(message);
-  if (!card || !card.face) return;
-  if (!isCardMessageFaceUp(message)) return;
+  const card = getChatCardFromMessage(message, html);
+  const cardImage = getCardImage(card);
+  if (!card || !cardImage) return;
+  if (!isCardMessageFaceUp(message, card)) return;
 
   const contentNode = html.querySelector(".message-content");
   if (!contentNode) return;
@@ -485,18 +526,18 @@ const enrichCardChatMessage = async (message, html) => {
   cardLink.classList.add("jay-helpers-card-link");
   cardLink.href = "#";
   cardLink.title = game.i18n.localize("JOURNAL.ActionShow");
-  cardLink.innerHTML = `<img src="${card.face}" alt="${card.name}" style="width: 48px; height: 48px; object-fit: cover; border: 0;"/>`;
+  cardLink.innerHTML = `<img src="${cardImage}" alt="${card.name}" style="width: 48px; height: 48px; object-fit: cover; border: 0;"/>`;
   cardLink.addEventListener("click", (event) => {
     event.preventDefault();
     const popout = new ImagePopout({
-      src: card.face,
+      src: cardImage,
       uuid: card.uuid,
       window: { title: card.name },
     });
     popout.render(true);
   });
 
-  const description = await foundry.applications.ux.TextEditor.enrichHTML(card.description ?? "", { async: true });
+  const description = await foundry.applications.ux.TextEditor.enrichHTML(getCardDescription(card), { async: true });
   const suit = getCardLabel(card.suit ?? card.system?.suit);
   const value = getCardLabel(card.value ?? card.system?.value);
   const meta = [
