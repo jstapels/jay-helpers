@@ -87,6 +87,7 @@ const SETTINGS = {
 
 const CARD_CHAT_DETAIL_FLAG = "cardDetails";
 const CARD_CHAT_DETAIL_TTL = 10000;
+const CARD_CHAT_DETAIL_FALLBACK_KEY = `${MODULE_ID}.cardDetails.fallback`;
 const pendingCardChatDetails = new Map();
 
 const CARD_HAND_SHEET_TEMPLATE = `modules/${MODULE_ID}/templates/horizontal-card-hand.hbs`;
@@ -671,13 +672,15 @@ class HorizontalCardHandConfig extends foundry.applications.sheets.CardHandConfi
 
   _resizeToFitCards() {
     const row = this.element.querySelector(".horizontal-card-hand__cards");
-    const scroller = this.element.querySelector(".horizontal-card-hand");
-    if (!row || !scroller?.clientWidth) return;
+    if (!row?.clientWidth) return;
 
     const currentWidth = this.position.width ?? this.element.getBoundingClientRect().width;
     const availableWidth = Math.max(320, window.innerWidth - CARD_HAND_WINDOW_MARGIN);
     const minimumWidth = Math.min(this.constructor.DEFAULT_OPTIONS.position.width, availableWidth);
-    const desiredWidth = Math.ceil(currentWidth + row.scrollWidth - scroller.clientWidth + 2);
+    const overflowWidth = row.scrollWidth - row.clientWidth;
+    if (overflowWidth <= 4) return;
+
+    const desiredWidth = Math.ceil(currentWidth + overflowWidth + 2);
     const width = Math.min(Math.max(minimumWidth, desiredWidth), availableWidth);
     if (Math.abs(width - currentWidth) > 4) this.setPosition({ width });
   }
@@ -742,7 +745,21 @@ const getCardDetailsDestination = (cards, candidates) => {
     ?? candidates.find((candidate) => cards.some((card) => cardBelongsToCardsDocument(candidate, card)));
 };
 
-const registerPendingCardChatDetails = (destination, cards, action) => {
+const isDrawCardAction = (action) => {
+  return typeof action === "string" && action.toLowerCase().includes("draw");
+};
+
+const isDrawCardMessageContent = (content) => {
+  const text = document.createElement("div");
+  text.innerHTML = content ?? "";
+  return (/\bdraw(?:s|n|ing)?\b|\bdrew\b/i).test(text.textContent ?? "");
+};
+
+const getCardDetailsKey = (cardDetails) => {
+  return cardDetails.map((detail) => detail.uuid ?? `${detail.name}:${detail.image}`).join("|");
+};
+
+const registerPendingCardChatDetails = (destination, cards, action, { fallback = false } = {}) => {
   const cardDetails = cards.map(getCardSnapshot).filter(Boolean);
   if (!cardDetails.length) return;
 
@@ -751,18 +768,23 @@ const registerPendingCardChatDetails = (destination, cards, action) => {
     action,
     cards: cardDetails,
     createdAt: Date.now(),
+    key: getCardDetailsKey(cardDetails),
   };
   const destinationUuids = new Set();
+  if (fallback) destinationUuids.add(CARD_CHAT_DETAIL_FALLBACK_KEY);
 
   for (const entry of destinations) {
     const cardsDocument = getCardsDocument(entry);
     if (!cardsDocument) continue;
     if (destinationUuids.has(cardsDocument.uuid)) continue;
     destinationUuids.add(cardsDocument.uuid);
+  }
 
-    const destinationQueue = pendingCardChatDetails.get(cardsDocument.uuid) ?? [];
+  for (const destinationUuid of destinationUuids) {
+    const destinationQueue = pendingCardChatDetails.get(destinationUuid) ?? [];
+    if (destinationQueue.some((queuedDetails) => queuedDetails.key === details.key)) continue;
     destinationQueue.push(details);
-    pendingCardChatDetails.set(cardsDocument.uuid, destinationQueue);
+    pendingCardChatDetails.set(destinationUuid, destinationQueue);
   }
 };
 
@@ -772,7 +794,9 @@ const captureDealtCardDetails = (origin, destinations, context) => {
 
   const toCreate = context.toCreate ?? [];
   destinations.forEach((destination, index) => {
-    registerPendingCardChatDetails(destination, normalizeCreatedCards(toCreate, index), context.action);
+    registerPendingCardChatDetails(destination, normalizeCreatedCards(toCreate, index), context.action, {
+      fallback: isDrawCardAction(context.action),
+    });
   });
 };
 
@@ -792,15 +816,36 @@ const captureDrawnCardDetails = (...args) => {
   const cards = normalizeCardCreateOperation(context?.toCreate ?? context?.toUpdate ?? []);
   const candidates = args.map(getCardsDocument).filter(Boolean);
   const destination = getCardDetailsDestination(cards, candidates);
-  registerPendingCardChatDetails([destination, ...candidates], cards, context?.action);
+  registerPendingCardChatDetails([destination, ...candidates], cards, context?.action, { fallback: true });
+};
+
+const captureCreatedCardDetails = (card, context) => {
+  const enabled = game.settings.get(MODULE_ID, SETTINGS.SHOW_CARD_PLAY_DETAILS.id);
+  if (!enabled) return;
+
+  const parent = getCardsDocument(card.parent);
+  if (!parent || parent.type === "deck") return;
+
+  const action = context?.action;
+  if (action && !isDrawCardAction(action)) return;
+  registerPendingCardChatDetails(parent, [card], action ?? "draw", { fallback: true });
 };
 
 const removePendingCardChatDetails = (details) => {
   for (const [destinationUuid, queue] of pendingCardChatDetails) {
-    const filteredQueue = queue.filter((queuedDetails) => queuedDetails !== details);
+    const filteredQueue = queue.filter((queuedDetails) => queuedDetails !== details && queuedDetails.key !== details.key);
     if (filteredQueue.length) pendingCardChatDetails.set(destinationUuid, filteredQueue);
     else pendingCardChatDetails.delete(destinationUuid);
   }
+};
+
+const getPersistableCardDetails = (details) => {
+  if (!details) return null;
+  return {
+    action: details.action,
+    cards: details.cards,
+    createdAt: details.createdAt,
+  };
 };
 
 const consumePendingCardChatDetails = (destinationUuids) => {
@@ -824,16 +869,19 @@ const addCardDetailsToChatMessage = (message) => {
   const enabled = game.settings.get(MODULE_ID, SETTINGS.SHOW_CARD_PLAY_DETAILS.id);
   if (!enabled) return;
 
-  const details = consumePendingCardChatDetails(getCardsUuidsFromContent(message.content));
+  let details = consumePendingCardChatDetails(getCardsUuidsFromContent(message.content));
+  if (!details && isDrawCardMessageContent(message.content)) {
+    details = consumePendingCardChatDetails([CARD_CHAT_DETAIL_FALLBACK_KEY]);
+  }
   if (!details) return;
-  message.updateSource({ [`flags.${MODULE_ID}.${CARD_CHAT_DETAIL_FLAG}`]: details });
+  message.updateSource({ [`flags.${MODULE_ID}.${CARD_CHAT_DETAIL_FLAG}`]: getPersistableCardDetails(details) });
 };
 
 const persistCardDetailsToChatMessage = async (message, details) => {
   if (!details?.cards?.length || getModuleFlag(message, CARD_CHAT_DETAIL_FLAG)) return;
 
   try {
-    await message.setFlag(MODULE_ID, CARD_CHAT_DETAIL_FLAG, details);
+    await message.setFlag(MODULE_ID, CARD_CHAT_DETAIL_FLAG, getPersistableCardDetails(details));
   } catch (error) {
     log("Unable to persist card chat details", error);
   }
@@ -1003,6 +1051,7 @@ const readyHook = () => {
   Hooks.on("dealCards", captureDealtCardDetails);
   Hooks.on("passCards", capturePassedCardDetails);
   Hooks.on("drawCards", captureDrawnCardDetails);
+  Hooks.on("createCard", captureCreatedCardDetails);
   Hooks.on("preCreateChatMessage", addCardDetailsToChatMessage);
 };
 
