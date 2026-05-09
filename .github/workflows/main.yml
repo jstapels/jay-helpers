@@ -16,9 +16,11 @@ concurrency:
 jobs:
   build_release:
     runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -33,57 +35,41 @@ jobs:
 
       - name: Get latest release version
         id: latest_release
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const { owner, repo } = context.repo;
-            try {
-              const latest = await github.rest.repos.getLatestRelease({ owner, repo });
-              const tag = latest.data.tag_name || '';
-              const version = tag.replace(/^v/, '');
-              core.setOutput('version', version);
-              core.setOutput('exists', 'true');
-            } catch (error) {
-              if (error.status === 404) {
-                core.setOutput('version', '0.0.0');
-                core.setOutput('exists', 'false');
-                return;
-              }
-              throw error;
-            }
+        run: |
+          if LATEST_TAG=$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq '.tag_name' 2>/dev/null); then
+            VERSION="${LATEST_TAG#v}"
+            echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=0.0.0" >> "$GITHUB_OUTPUT"
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Resolve PR bump type
         id: pr_bump
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const { owner, repo } = context.repo;
-            const sha = context.sha;
+        run: |
+          PRS=$(gh api \
+            -H "Accept: application/vnd.github+json" \
+            "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/pulls")
+          PR_NUMBER=$(jq -r '.[0].number // ""' <<< "$PRS")
 
-            const prs = await github.request('GET /repos/{owner}/{repo}/commits/{commit_sha}/pulls', {
-              owner,
-              repo,
-              commit_sha: sha,
-              mediaType: { previews: ['groot'] },
-            });
+          if [ -z "$PR_NUMBER" ]; then
+            echo "bump=patch" >> "$GITHUB_OUTPUT"
+            echo "pr_number=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
 
-            if (!prs.data.length) {
-              core.setOutput('bump', 'patch');
-              core.setOutput('pr_number', '');
-              return;
-            }
+          BUMP=$(jq -r '
+            .[0].labels
+            | map(.name | ascii_downcase)
+            | if index("major") then "major"
+              elif index("minor") then "minor"
+              else "patch"
+              end
+          ' <<< "$PRS")
 
-            const pr = prs.data[0];
-            const labels = (pr.labels || []).map((label) => String(label.name || '').toLowerCase());
-            const hasMajor = labels.includes('major');
-            const hasMinor = labels.includes('minor');
-
-            let bump = 'patch';
-            if (hasMajor) bump = 'major';
-            else if (hasMinor) bump = 'minor';
-
-            core.setOutput('bump', bump);
-            core.setOutput('pr_number', String(pr.number));
+          echo "bump=$BUMP" >> "$GITHUB_OUTPUT"
+          echo "pr_number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
 
       - name: Compute next version
         id: next_version
@@ -92,10 +78,11 @@ jobs:
           PREVIOUS_VERSION: ${{ steps.latest_release.outputs.version }}
           BUMP_TYPE: ${{ steps.pr_bump.outputs.bump }}
         run: |
-          if [ "$MANIFEST_VERSION" != "$PREVIOUS_VERSION" ]; then
-            NEXT_VERSION="$MANIFEST_VERSION"
-            REASON="module.json version changed"
-          else
+          version_gt() {
+            [ "$1" != "$2" ] && [ "$(printf '%s\n%s\n' "$2" "$1" | sort -V | head -n 1)" = "$2" ]
+          }
+
+          bump_previous_version() {
             IFS='.' read -r MAJOR MINOR PATCH <<< "$PREVIOUS_VERSION"
             case "$BUMP_TYPE" in
               major)
@@ -112,30 +99,43 @@ jobs:
                 ;;
             esac
             NEXT_VERSION="${MAJOR}.${MINOR}.${PATCH}"
-            REASON="${BUMP_TYPE} bump from PR tag"
+          }
+
+          if version_gt "$MANIFEST_VERSION" "$PREVIOUS_VERSION"; then
+            NEXT_VERSION="$MANIFEST_VERSION"
+            REASON="module.json version changed"
+          else
+            bump_previous_version
+            if [ "$MANIFEST_VERSION" = "$PREVIOUS_VERSION" ]; then
+              REASON="${BUMP_TYPE} bump from PR label"
+            else
+              REASON="${BUMP_TYPE} bump from latest release; stale module.json version ignored"
+            fi
           fi
 
           echo "version=$NEXT_VERSION" >> "$GITHUB_OUTPUT"
           echo "tag=v$NEXT_VERSION" >> "$GITHUB_OUTPUT"
           echo "reason=$REASON" >> "$GITHUB_OUTPUT"
 
-      - name: Update manifest URLs for release
-        uses: microsoft/variable-substitution@v1
-        with:
-          files: module.json
-        env:
-          version: ${{ steps.next_version.outputs.version }}
-          url: https://github.com/${{ github.repository }}
-          manifest: https://github.com/${{ github.repository }}/releases/latest/download/module.json
-          download: https://github.com/${{ github.repository }}/releases/download/${{ steps.next_version.outputs.tag }}/jay-helpers.zip
-          changelog: https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md
-          readme: https://github.com/${{ github.repository }}/blob/main/README.md
-
-      - name: Ensure manifest version matches resolved release version
+      - name: Update manifest for release
         env:
           RELEASE_VERSION: ${{ steps.next_version.outputs.version }}
+          RELEASE_TAG: ${{ steps.next_version.outputs.tag }}
         run: |
-          jq --arg version "$RELEASE_VERSION" '.version = $version' module.json > module.tmp.json
+          jq \
+            --arg version "$RELEASE_VERSION" \
+            --arg url "https://github.com/$GITHUB_REPOSITORY" \
+            --arg manifest "https://github.com/$GITHUB_REPOSITORY/releases/latest/download/module.json" \
+            --arg download "https://github.com/$GITHUB_REPOSITORY/releases/download/$RELEASE_TAG/jay-helpers.zip" \
+            --arg changelog "https://github.com/$GITHUB_REPOSITORY/blob/main/CHANGELOG.md" \
+            --arg readme "https://github.com/$GITHUB_REPOSITORY/blob/main/README.md" \
+            '.version = $version
+              | .url = $url
+              | .manifest = $manifest
+              | .download = $download
+              | .changelog = $changelog
+              | .readme = $readme' \
+            module.json > module.tmp.json
           mv module.tmp.json module.json
 
       - name: Ensure package version matches resolved release version
