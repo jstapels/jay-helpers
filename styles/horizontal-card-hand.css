@@ -2,31 +2,6 @@
   display: flex;
   flex-direction: column;
   min-height: 0;
-  min-width: 0;
-  width: 100%;
-}
-
-.horizontal-card-hand__toolbar {
-  align-items: center;
-  display: flex;
-  justify-content: flex-end;
-  margin: 0 0 0.5rem;
-}
-
-.horizontal-card-hand__size-control {
-  align-items: center;
-  display: inline-flex;
-  gap: 0.4rem;
-  white-space: nowrap;
-}
-
-.horizontal-card-hand__size-control span {
-  font-weight: 600;
-}
-
-.horizontal-card-hand__size-select {
-  height: 1.8rem;
-  width: 8rem;
 }
 
 .horizontal-card-hand__cards {
@@ -35,11 +10,9 @@
   list-style: none;
   margin: 0;
   min-height: 0;
-  min-width: 0;
   overflow-x: auto;
   overflow-y: hidden;
   padding: 0.25rem 0.25rem 0.5rem;
-  width: 100%;
 }
 
 .horizontal-card-hand__card {
@@ -49,18 +22,6 @@
   flex-direction: column;
   gap: 0.35rem;
   min-width: 0;
-}
-
-.horizontal-card-hand[data-thumbnail-size="small"] .horizontal-card-hand__card {
-  flex-basis: 124px;
-}
-
-.horizontal-card-hand[data-thumbnail-size="medium"] .horizontal-card-hand__card {
-  flex-basis: 164px;
-}
-
-.horizontal-card-hand[data-thumbnail-size="large"] .horizontal-card-hand__card {
-  flex-basis: 220px;
 }
 
 .horizontal-card-hand__thumbnail {

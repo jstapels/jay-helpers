@@ -76,13 +76,6 @@ const SETTINGS = {
     default: true,
     scope: "world",
   },
-  HORIZONTAL_CARD_HAND_THUMBNAIL_SIZE: {
-    id: "horizontalCardHandThumbnailSize",
-    type: String,
-    default: "medium",
-    scope: "client",
-    config: false,
-  },
 };
 
 const CARD_CHAT_DETAIL_FLAG = "cardDetails";
@@ -91,8 +84,6 @@ const CARD_CHAT_DETAIL_FALLBACK_KEY = `${MODULE_ID}.cardDetails.fallback`;
 const pendingCardChatDetails = new Map();
 
 const CARD_HAND_SHEET_TEMPLATE = `modules/${MODULE_ID}/templates/horizontal-card-hand.hbs`;
-const CARD_HAND_WINDOW_MARGIN = 32;
-const CARD_HAND_THUMBNAIL_SIZES = ["small", "medium", "large"];
 
 /**
  * Log to the console.
@@ -604,22 +595,10 @@ const getCardThumbnailData = (card) => {
   };
 };
 
-const getCardHandThumbnailSize = () => {
-  const size = game.settings.get(MODULE_ID, SETTINGS.HORIZONTAL_CARD_HAND_THUMBNAIL_SIZE.id);
-  return CARD_HAND_THUMBNAIL_SIZES.includes(size) ? size : "medium";
-};
-
-const getCardHandThumbnailSizeOptions = (selectedSize) => {
-  return CARD_HAND_THUMBNAIL_SIZES.map((size) => ({
-    label: game.i18n.localize(`${MODULE_ID}.cards.thumbnailSizes.${size}`),
-    selected: size === selectedSize,
-    value: size,
-  }));
-};
-
 class HorizontalCardHandConfig extends foundry.applications.sheets.CardHandConfig {
   static DEFAULT_OPTIONS = {
-    position: { width: 780 },
+    position: { width: 600 },
+    resizable: true,
     actions: {
       flipCard: HorizontalCardHandConfig.flipCard,
       playCard: HorizontalCardHandConfig.playCard,
@@ -642,47 +621,15 @@ class HorizontalCardHandConfig extends foundry.applications.sheets.CardHandConfi
     const preparedContext = await super._preparePartContext(partId, context, options);
     if (partId !== "cards") return preparedContext;
     const cards = preparedContext.cards ?? this._prepareCards();
-    const thumbnailSize = getCardHandThumbnailSize();
     return {
       ...preparedContext,
       handCards: cards.map((card) => getCardThumbnailData(card.document ?? card)),
-      thumbnailSize,
-      thumbnailSizeOptions: getCardHandThumbnailSizeOptions(thumbnailSize),
     };
-  }
-
-  async _onRender(context, options) {
-    await super._onRender(context, options);
-    this.element.querySelector(".horizontal-card-hand__size-select")
-      ?.addEventListener("change", this._onThumbnailSizeChange.bind(this));
-    requestAnimationFrame(() => this._resizeToFitCards());
   }
 
   _getCardFromTarget(target) {
     const cardId = target.closest("[data-card-id]")?.dataset.cardId;
     return cardId ? this.document.cards.get(cardId) : null;
-  }
-
-  async _onThumbnailSizeChange(event) {
-    const size = event.currentTarget.value;
-    if (!CARD_HAND_THUMBNAIL_SIZES.includes(size)) return;
-    await game.settings.set(MODULE_ID, SETTINGS.HORIZONTAL_CARD_HAND_THUMBNAIL_SIZE.id, size);
-    await this.render();
-  }
-
-  _resizeToFitCards() {
-    const row = this.element.querySelector(".horizontal-card-hand__cards");
-    if (!row?.clientWidth) return;
-
-    const currentWidth = this.position.width ?? this.element.getBoundingClientRect().width;
-    const availableWidth = Math.max(320, window.innerWidth - CARD_HAND_WINDOW_MARGIN);
-    const minimumWidth = Math.min(this.constructor.DEFAULT_OPTIONS.position.width, availableWidth);
-    const overflowWidth = row.scrollWidth - row.clientWidth;
-    if (overflowWidth <= 4) return;
-
-    const desiredWidth = Math.ceil(currentWidth + overflowWidth + 2);
-    const width = Math.min(Math.max(minimumWidth, desiredWidth), availableWidth);
-    if (Math.abs(width - currentWidth) > 4) this.setPosition({ width });
   }
 
   static async flipCard(event, target) {
