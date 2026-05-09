@@ -720,17 +720,50 @@ const normalizeCreatedCards = (toCreate, destinationIndex) => {
   return normalizeCardCreateOperation(toCreate);
 };
 
+const getCardsDocument = (document) => {
+  return document?.documentName === "Cards" ? document : null;
+};
+
+const getCardIdentifier = (card) => {
+  return card?.id ?? card?._id;
+};
+
+const cardBelongsToCardsDocument = (cardsDocument, card) => {
+  const cardId = getCardIdentifier(card);
+  return Boolean(cardId && cardsDocument.cards?.get(cardId));
+};
+
+const getCardParentCardsDocument = (card) => {
+  return getCardsDocument(card?.parent);
+};
+
+const getCardDetailsDestination = (cards, candidates) => {
+  return cards.map(getCardParentCardsDocument).find(Boolean)
+    ?? candidates.find((candidate) => cards.some((card) => cardBelongsToCardsDocument(candidate, card)));
+};
+
 const registerPendingCardChatDetails = (destination, cards, action) => {
   const cardDetails = cards.map(getCardSnapshot).filter(Boolean);
   if (!cardDetails.length) return;
 
-  const destinationQueue = pendingCardChatDetails.get(destination.uuid) ?? [];
-  destinationQueue.push({
+  const destinations = Array.isArray(destination) ? destination : [destination];
+  const details = {
     action,
     cards: cardDetails,
     createdAt: Date.now(),
-  });
-  pendingCardChatDetails.set(destination.uuid, destinationQueue);
+  };
+  const destinationUuids = new Set();
+
+  for (const entry of destinations) {
+    const cardsDocument = getCardsDocument(entry);
+    if (!cardsDocument) continue;
+    if (destinationUuids.has(cardsDocument.uuid)) continue;
+    destinationUuids.add(cardsDocument.uuid);
+
+    const destinationQueue = pendingCardChatDetails.get(cardsDocument.uuid) ?? [];
+    destinationQueue.push(details);
+    pendingCardChatDetails.set(cardsDocument.uuid, destinationQueue);
+  }
 };
 
 const captureDealtCardDetails = (origin, destinations, context) => {
@@ -751,6 +784,25 @@ const capturePassedCardDetails = (origin, destination, context) => {
   registerPendingCardChatDetails(destination, cards, context.action);
 };
 
+const captureDrawnCardDetails = (...args) => {
+  const enabled = game.settings.get(MODULE_ID, SETTINGS.SHOW_CARD_PLAY_DETAILS.id);
+  if (!enabled) return;
+
+  const context = args.at(-1);
+  const cards = normalizeCardCreateOperation(context?.toCreate ?? context?.toUpdate ?? []);
+  const candidates = args.map(getCardsDocument).filter(Boolean);
+  const destination = getCardDetailsDestination(cards, candidates);
+  registerPendingCardChatDetails([destination, ...candidates], cards, context?.action);
+};
+
+const removePendingCardChatDetails = (details) => {
+  for (const [destinationUuid, queue] of pendingCardChatDetails) {
+    const filteredQueue = queue.filter((queuedDetails) => queuedDetails !== details);
+    if (filteredQueue.length) pendingCardChatDetails.set(destinationUuid, filteredQueue);
+    else pendingCardChatDetails.delete(destinationUuid);
+  }
+};
+
 const consumePendingCardChatDetails = (destinationUuids) => {
   const now = Date.now();
   for (const destinationUuid of destinationUuids) {
@@ -758,9 +810,10 @@ const consumePendingCardChatDetails = (destinationUuids) => {
     if (!queue?.length) continue;
 
     const freshQueue = queue.filter((details) => now - details.createdAt <= CARD_CHAT_DETAIL_TTL);
-    const details = freshQueue.shift();
     if (freshQueue.length) pendingCardChatDetails.set(destinationUuid, freshQueue);
     else pendingCardChatDetails.delete(destinationUuid);
+    const details = freshQueue[0];
+    if (details) removePendingCardChatDetails(details);
     if (details) return details;
   }
 
@@ -949,6 +1002,7 @@ const readyHook = () => {
   Hooks.on("applyTokenStatusEffect", applyTokenStatusEffect);
   Hooks.on("dealCards", captureDealtCardDetails);
   Hooks.on("passCards", capturePassedCardDetails);
+  Hooks.on("drawCards", captureDrawnCardDetails);
   Hooks.on("preCreateChatMessage", addCardDetailsToChatMessage);
 };
 
