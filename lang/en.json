@@ -56,7 +56,13 @@
             "faceNumber": "Face {number} of {total}",
             "flip": "Flip",
             "playCard": "Play {name}",
-            "sheetName": "Horizontal Card Hand"
+            "sheetName": "Horizontal Card Hand",
+            "thumbnailSize": "Thumbnail size",
+            "thumbnailSizes": {
+                "large": "Large",
+                "medium": "Medium",
+                "small": "Small"
+            }
         }
     }
 }

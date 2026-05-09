@@ -1,4 +1,19 @@
-<section class="cards horizontal-card-hand" data-stack-id="{{document.id}}">
+<section
+  class="cards horizontal-card-hand"
+  data-stack-id="{{document.id}}"
+  data-thumbnail-size="{{thumbnailSize}}"
+>
+  <div class="horizontal-card-hand__toolbar">
+    <label class="horizontal-card-hand__size-control">
+      <span>{{localize "jay-helpers.cards.thumbnailSize"}}</span>
+      <select class="horizontal-card-hand__size-select" name="thumbnailSize">
+        {{#each thumbnailSizeOptions as |size|}}
+          <option value="{{size.value}}" {{#if size.selected}}selected{{/if}}>{{size.label}}</option>
+        {{/each}}
+      </select>
+    </label>
+  </div>
+
   {{#if handCards.length}}
     <ol class="horizontal-card-hand__cards">
       {{#each handCards as |card|}}
