@@ -32,10 +32,14 @@
   ],
   "url": "https://github.com/jstapels/jay-helpers",
   "bugs": "https://github.com/jstapels/jay-helpers/issues",
-  "changelog": "https://github.com/jstapels/jay-helpers/releases",
+  "changelog": "https://github.com/jstapels/jay-helpers/blob/main/CHANGELOG.md",
   "license": "https://github.com/jstapels/jay-helpers/raw/main/LICENSE",
-  "readme": "https://github.com/jstapels/jay-helpers/main/README.md",
+  "readme": "https://github.com/jstapels/jay-helpers/blob/main/README.md",
   "manifest": "https://github.com/jstapels/jay-helpers/releases/latest/download/module.json",
-  "download": "https://github.com/jstapels/jay-helpers/releases/download/v1.0.0/jay-helpers.zip",
-  "authors": [{"name": "Jason Stapels"}]
+  "download": "https://github.com/jstapels/jay-helpers/releases/download/v1.7.1/jay-helpers.zip",
+  "authors": [
+    {
+      "name": "Jason Stapels"
+    }
+  ]
 }
