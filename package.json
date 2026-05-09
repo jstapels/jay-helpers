@@ -1,6 +1,6 @@
 {
   "name": "jay-helpers",
-  "version": "1.7.6",
+  "version": "1.7.7",
   "description": "One of Jason's Foundry VTT modules.",
   "scripts": {
     "lint": "npx eslint scripts/",
