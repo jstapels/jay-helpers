@@ -629,6 +629,16 @@ const addCardDetailsToChatMessage = (message) => {
   message.updateSource({ [`flags.${MODULE_ID}.${CARD_CHAT_DETAIL_FLAG}`]: details });
 };
 
+const persistCardDetailsToChatMessage = async (message, details) => {
+  if (!details?.cards?.length || getModuleFlag(message, CARD_CHAT_DETAIL_FLAG)) return;
+
+  try {
+    await message.setFlag(MODULE_ID, CARD_CHAT_DETAIL_FLAG, details);
+  } catch (error) {
+    log("Unable to persist card chat details", error);
+  }
+};
+
 const getCardLabel = (value) => {
   if (value === undefined || value === null || value === "") return null;
   if (typeof value === "string") return value.trim() || null;
@@ -639,16 +649,31 @@ const enrichCardChatMessage = async (message, html) => {
   const enabled = game.settings.get(MODULE_ID, SETTINGS.SHOW_CARD_PLAY_DETAILS.id);
   if (!enabled) return;
 
-  const cardDetails = getModuleFlag(message, CARD_CHAT_DETAIL_FLAG)
-    ?? consumePendingCardChatDetails(getChatCardsUuids(message, html));
-  const cards = cardDetails?.cards ?? [];
-
-  const card = cards.length ? null : getChatCardFromMessage(message);
-  const cardImage = getCardImage(card);
-  if (!cards.length && (!card || !cardImage || !isCardMessageFaceUp(message, card))) return;
-
   const contentNode = html.querySelector(".message-content");
   if (!contentNode) return;
+  if (contentNode.querySelector(".jay-helpers-card-chat-details")) return;
+
+  let cardDetails = getModuleFlag(message, CARD_CHAT_DETAIL_FLAG);
+  if (!cardDetails) {
+    cardDetails = consumePendingCardChatDetails(getChatCardsUuids(message, html));
+  }
+
+  let detailsToRender = cardDetails?.cards ?? [];
+  if (!detailsToRender.length) {
+    const card = getChatCardFromMessage(message);
+    const cardImage = getCardImage(card);
+    if (!card || !cardImage || !isCardMessageFaceUp(message, card)) return;
+
+    detailsToRender = [{
+      description: getCardDescription(card),
+      image: cardImage,
+      name: card.name,
+      suit: card.suit ?? card.system?.suit,
+      uuid: card.uuid,
+      value: card.value ?? card.system?.value,
+    }];
+    cardDetails = { cards: detailsToRender };
+  }
 
   const renderCardButton = (detail) => {
     const cardLink = document.createElement("button");
@@ -721,18 +746,8 @@ const enrichCardChatMessage = async (message, html) => {
     return wrapper;
   };
 
-  const detailsToRender = cards.length
-    ? cards
-    : [{
-      description: getCardDescription(card),
-      image: cardImage,
-      name: card.name,
-      suit: card.suit ?? card.system?.suit,
-      uuid: card.uuid,
-      value: card.value ?? card.system?.value,
-    }];
-
   const detailsWrapper = document.createElement("div");
+  detailsWrapper.classList.add("jay-helpers-card-chat-details");
   detailsWrapper.style.display = "flex";
   detailsWrapper.style.flexDirection = "column";
   detailsWrapper.style.gap = "0.5rem";
@@ -742,6 +757,7 @@ const enrichCardChatMessage = async (message, html) => {
   }
 
   contentNode.append(detailsWrapper);
+  await persistCardDetailsToChatMessage(message, cardDetails);
 };
 
 /**
