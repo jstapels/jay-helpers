@@ -138,6 +138,43 @@ jobs:
           jq --arg version "$RELEASE_VERSION" '.version = $version' module.json > module.tmp.json
           mv module.tmp.json module.json
 
+      - name: Ensure package version matches resolved release version
+        env:
+          RELEASE_VERSION: ${{ steps.next_version.outputs.version }}
+        run: |
+          jq --arg version "$RELEASE_VERSION" '.version = $version' package.json > package.tmp.json
+          mv package.tmp.json package.json
+
+          if [ -f package-lock.json ]; then
+            PACKAGE_NAME=$(jq -r '.name' package.json)
+            jq --arg name "$PACKAGE_NAME" --arg version "$RELEASE_VERSION" '
+              .name = $name
+              | .version = $version
+              | .packages[""].name = $name
+              | .packages[""].version = $version
+            ' package-lock.json > package-lock.tmp.json
+            mv package-lock.tmp.json package-lock.json
+          fi
+
+      - name: Commit resolved version to main
+        env:
+          RELEASE_VERSION: ${{ steps.next_version.outputs.version }}
+        run: |
+          if git diff --quiet -- module.json package.json package-lock.json; then
+            echo "Version files already match $RELEASE_VERSION"
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add module.json package.json package-lock.json
+          git commit -m "chore: release v$RELEASE_VERSION [skip ci]"
+          git push origin HEAD:main
+
+      - name: Get release commit
+        id: release_commit
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
       - name: Create release archive
         run: zip -r ./jay-helpers.zip module.json LICENSE lang/ scripts/ images/
 
@@ -146,6 +183,7 @@ jobs:
         with:
           allowUpdates: true
           artifacts: ./module.json,./jay-helpers.zip
+          commit: ${{ steps.release_commit.outputs.sha }}
           generateReleaseNotes: true
           tag: ${{ steps.next_version.outputs.tag }}
           name: ${{ steps.next_version.outputs.tag }}
@@ -153,5 +191,5 @@ jobs:
             Automated release from merge into main.
 
             Version reason: ${{ steps.next_version.outputs.reason }}.
-            Source commit: ${{ github.sha }}
+            Source commit: ${{ steps.release_commit.outputs.sha }}
             PR: ${{ steps.pr_bump.outputs.pr_number != '' && format('#{0}', steps.pr_bump.outputs.pr_number) || 'N/A' }}

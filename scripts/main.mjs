@@ -421,30 +421,38 @@ const applyTokenStatusEffect = async (token, status, state) => {
   }
 };
 
+const getMessageFlag = (message, scope, key) => {
+  try {
+    return message.getFlag(scope, key);
+  } catch {
+    return message.flags?.[scope]?.[key];
+  }
+};
+
 const getChatCardFromMessage = (message) => {
-  const cardUuid = message.getFlag("core", "cardUuid")
-    ?? message.getFlag("cards", "cardUuid")
-    ?? message.getFlag("core", "sourceUuid");
+  const cardUuid = getMessageFlag(message, "core", "cardUuid")
+    ?? getMessageFlag(message, "cards", "cardUuid")
+    ?? getMessageFlag(message, "core", "sourceUuid");
 
   if (cardUuid) return fromUuidSync(cardUuid);
 
   const deck = game.cards?.get(message.speaker?.scene);
   if (!deck) return null;
-  const cardId = message.getFlag("cards", "cardId");
+  const cardId = getMessageFlag(message, "cards", "cardId");
   if (cardId) return deck.cards.get(cardId);
 
   return null;
 };
 
 const isCardMessageFaceUp = (message) => {
-  const faceUpFlag = message.getFlag("cards", "faceUp")
-    ?? message.getFlag("core", "faceUp")
-    ?? message.getFlag("cards", "isFaceUp");
+  const faceUpFlag = getMessageFlag(message, "cards", "faceUp")
+    ?? getMessageFlag(message, "core", "faceUp")
+    ?? getMessageFlag(message, "cards", "isFaceUp");
   if (typeof faceUpFlag === "boolean") return faceUpFlag;
 
-  const facedownFlag = message.getFlag("cards", "facedown")
-    ?? message.getFlag("core", "facedown")
-    ?? message.getFlag("cards", "isFaceDown");
+  const facedownFlag = getMessageFlag(message, "cards", "facedown")
+    ?? getMessageFlag(message, "core", "facedown")
+    ?? getMessageFlag(message, "cards", "isFaceDown");
   if (typeof facedownFlag === "boolean") return !facedownFlag;
 
   const cardFlags = message.flags?.cards;
