@@ -70,6 +70,12 @@ const SETTINGS = {
     default: true,
     scope: "world",
   },
+  SHOW_CARD_PLAY_DETAILS: {
+    id: "showCardPlayDetails",
+    type: Boolean,
+    default: true,
+    scope: "world",
+  },
 };
 
 /**
@@ -415,6 +421,98 @@ const applyTokenStatusEffect = async (token, status, state) => {
   }
 };
 
+const getChatCardFromMessage = (message) => {
+  const cardUuid = message.getFlag("core", "cardUuid")
+    ?? message.getFlag("cards", "cardUuid")
+    ?? message.getFlag("core", "sourceUuid");
+
+  if (cardUuid) return fromUuidSync(cardUuid);
+
+  const deck = game.cards?.get(message.speaker?.scene);
+  if (!deck) return null;
+  const cardId = message.getFlag("cards", "cardId");
+  if (cardId) return deck.cards.get(cardId);
+
+  return null;
+};
+
+const isCardMessageFaceUp = (message) => {
+  const faceUpFlag = message.getFlag("cards", "faceUp")
+    ?? message.getFlag("core", "faceUp")
+    ?? message.getFlag("cards", "isFaceUp");
+  if (typeof faceUpFlag === "boolean") return faceUpFlag;
+
+  const facedownFlag = message.getFlag("cards", "facedown")
+    ?? message.getFlag("core", "facedown")
+    ?? message.getFlag("cards", "isFaceDown");
+  if (typeof facedownFlag === "boolean") return !facedownFlag;
+
+  const cardFlags = message.flags?.cards;
+  const nestedFaceUp = cardFlags?.card?.faceUp ?? cardFlags?.cardData?.faceUp;
+  if (typeof nestedFaceUp === "boolean") return nestedFaceUp;
+  const nestedFaceDown = cardFlags?.card?.facedown ?? cardFlags?.cardData?.facedown;
+  if (typeof nestedFaceDown === "boolean") return !nestedFaceDown;
+
+  return false;
+};
+
+const getCardLabel = (value) => {
+  if (value === undefined || value === null || value === "") return null;
+  if (typeof value === "string") return value.trim() || null;
+  return String(value);
+};
+
+const enrichCardChatMessage = async (message, html) => {
+  const enabled = game.settings.get(MODULE_ID, SETTINGS.SHOW_CARD_PLAY_DETAILS.id);
+  if (!enabled) return;
+
+  const card = getChatCardFromMessage(message);
+  if (!card || !card.face) return;
+  if (!isCardMessageFaceUp(message)) return;
+
+  const contentNode = html.querySelector(".message-content");
+  if (!contentNode) return;
+
+  const cardLink = document.createElement("a");
+  cardLink.classList.add("jay-helpers-card-link");
+  cardLink.href = "#";
+  cardLink.title = game.i18n.localize("JOURNAL.ActionShow");
+  cardLink.innerHTML = `<img src="${card.face}" alt="${card.name}" style="width: 48px; height: 48px; object-fit: cover; border: 0;"/>`;
+  cardLink.addEventListener("click", (event) => {
+    event.preventDefault();
+    const popout = new ImagePopout({
+      src: card.face,
+      uuid: card.uuid,
+      window: { title: card.name },
+    });
+    popout.render(true);
+  });
+
+  const description = await foundry.applications.ux.TextEditor.enrichHTML(card.description ?? "", { async: true });
+  const suit = getCardLabel(card.suit ?? card.system?.suit);
+  const value = getCardLabel(card.value ?? card.system?.value);
+  const meta = [
+    suit ? `<span><strong>Suit:</strong> ${suit}</span>` : null,
+    value ? `<span><strong>Value:</strong> ${value}</span>` : null,
+  ].filter(Boolean).join(" <span aria-hidden=\"true\">•</span> ");
+
+  const details = document.createElement("div");
+  details.classList.add("jay-helpers-card-details");
+  details.innerHTML = `
+    <div style="display:flex; flex-direction:column; gap:0.2rem;">
+      <p style="margin:0;"><strong>${card.name}</strong></p>
+      ${meta ? `<p style="margin:0; font-size:0.9em; opacity:0.9;">${meta}</p>` : ""}
+      ${description}
+    </div>`;
+
+  const wrapper = document.createElement("div");
+  wrapper.style.display = "flex";
+  wrapper.style.gap = "0.5rem";
+  wrapper.style.alignItems = "flex-start";
+  wrapper.append(cardLink, details);
+  contentNode.append(wrapper);
+};
+
 /**
  * Called when Foundry has been initialized.
  */
@@ -451,6 +549,7 @@ const readyHook = () => {
   Hooks.on("preCreateActiveEffect", preCreateActiveEffect);
   Hooks.on('dnd5e.applyDamage', applyDamage);
   Hooks.on("applyTokenStatusEffect", applyTokenStatusEffect);
+  Hooks.on("renderChatMessageHTML", enrichCardChatMessage);
 };
 
 Hooks.once('init', initHook);
