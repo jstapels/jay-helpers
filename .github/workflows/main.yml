@@ -176,7 +176,7 @@ jobs:
         run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: Create release archive
-        run: zip -r ./jay-helpers.zip module.json LICENSE lang/ scripts/ images/
+        run: zip -r ./jay-helpers.zip module.json LICENSE lang/ scripts/ images/ styles/ templates/
 
       - name: Create or update GitHub release
         uses: ncipollo/release-action@v1
