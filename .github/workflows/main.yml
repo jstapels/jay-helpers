@@ -1,3 +1,5 @@
+name: Release
+
 on:
   release:
     types: [published]
@@ -21,11 +23,15 @@ jobs:
 
       - name: Extract version from release tag
         id: get_version
-        uses: battila7/get-version-action@v2
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          TAG_VERSION="${RELEASE_TAG#v}"
+          echo "version_without_v=$TAG_VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Validate tag version matches module manifest
         env:
-          TAG_VERSION: ${{ steps.get_version.outputs.version-without-v }}
+          TAG_VERSION: ${{ steps.get_version.outputs.version_without_v }}
         run: |
           MANIFEST_VERSION=$(jq -r '.version' module.json)
           if [ "$TAG_VERSION" != "$MANIFEST_VERSION" ]; then
