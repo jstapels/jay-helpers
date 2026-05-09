@@ -78,6 +78,10 @@ const SETTINGS = {
   },
 };
 
+const CARD_CHAT_DETAIL_FLAG = "cardDetails";
+const CARD_CHAT_DETAIL_TTL = 10000;
+const pendingCardChatDetails = new Map();
+
 /**
  * Log to the console.
  * 
@@ -429,6 +433,10 @@ const getMessageFlag = (message, scope, key) => {
   }
 };
 
+const getModuleFlag = (document, key) => {
+  return getMessageFlag(document, MODULE_ID, key);
+};
+
 const getCardFromUuid = (uuid) => {
   if (!uuid) return null;
   try {
@@ -440,11 +448,6 @@ const getCardFromUuid = (uuid) => {
   return null;
 };
 
-const getChatCardUuidFromHtml = (html) => {
-  const uuidNode = html.querySelector("[data-uuid*='.Card.'], [data-document-uuid*='.Card.']");
-  return uuidNode?.dataset.uuid ?? uuidNode?.dataset.documentUuid ?? null;
-};
-
 const findCardById = (cardId) => {
   if (!cardId) return null;
   for (const cards of game.cards ?? []) {
@@ -454,12 +457,29 @@ const findCardById = (cardId) => {
   return null;
 };
 
-const getChatCardFromMessage = (message, html) => {
+const getCardsUuidPattern = /@UUID\[(Cards\.[^\]]+)\]/g;
+
+const getCardsUuidsFromContent = (content) => {
+  return Array.from(content?.matchAll(getCardsUuidPattern) ?? [], (match) => match[1]);
+};
+
+const getCardsUuidsFromHtml = (html) => {
+  const uuidNodes = html.querySelectorAll("[data-uuid^='Cards.'], [data-document-uuid^='Cards.']");
+  return Array.from(uuidNodes, (node) => node.dataset.uuid ?? node.dataset.documentUuid).filter(Boolean);
+};
+
+const getChatCardsUuids = (message, html) => {
+  return [
+    ...getCardsUuidsFromContent(message.content),
+    ...getCardsUuidsFromHtml(html),
+  ];
+};
+
+const getChatCardFromMessage = (message) => {
   const cardUuid = getMessageFlag(message, "core", "cardUuid")
     ?? getMessageFlag(message, "cards", "cardUuid")
     ?? getMessageFlag(message, "core", "sourceUuid")
-    ?? getMessageFlag(message, "core", "sourceId")
-    ?? getChatCardUuidFromHtml(html);
+    ?? getMessageFlag(message, "core", "sourceId");
 
   const cardFromUuid = getCardFromUuid(cardUuid);
   if (cardFromUuid) return cardFromUuid;
@@ -504,6 +524,103 @@ const getCardDescription = (card) => {
   return card?.currentFace?.description ?? card?.description ?? "";
 };
 
+const getCardFace = (card) => {
+  const faceIndex = card?.face;
+  return card?.currentFace ?? card?.faces?.[faceIndex] ?? null;
+};
+
+const isCardSnapshotFaceUp = (card) => {
+  if (typeof card?.showFace === "boolean") return card.showFace;
+  return card?.face !== null && card?.face !== undefined;
+};
+
+const getCardSnapshotImage = (card) => {
+  const face = getCardFace(card);
+  return card?.img ?? face?.img ?? null;
+};
+
+const getCardSnapshotDescription = (card) => {
+  const face = getCardFace(card);
+  return face?.description ?? card?.description ?? "";
+};
+
+const getCardSnapshot = (card) => {
+  const image = getCardSnapshotImage(card);
+  if (!card || !image || !isCardSnapshotFaceUp(card)) return null;
+
+  return {
+    name: card.name,
+    description: getCardSnapshotDescription(card),
+    image,
+    suit: card.suit ?? card.system?.suit,
+    value: card.value ?? card.system?.value,
+    uuid: card.uuid ?? null,
+  };
+};
+
+const normalizeCardCreateOperation = (operation) => {
+  if (!operation) return [];
+  if (Array.isArray(operation)) return operation.flatMap(normalizeCardCreateOperation);
+  if (Array.isArray(operation.data)) return operation.data.flatMap(normalizeCardCreateOperation);
+  if (operation.data) return normalizeCardCreateOperation(operation.data);
+  return [operation];
+};
+
+const normalizeCreatedCards = (toCreate, destinationIndex) => {
+  const created = toCreate[destinationIndex];
+  if (Array.isArray(created)) return created.flatMap(normalizeCardCreateOperation);
+  if (Array.isArray(toCreate) && toCreate.every((entry) => Array.isArray(entry))) return [];
+  return normalizeCardCreateOperation(toCreate);
+};
+
+const registerPendingCardChatDetails = (destination, cards, action) => {
+  const cardDetails = cards.map(getCardSnapshot).filter(Boolean);
+  if (!cardDetails.length) return;
+
+  const destinationQueue = pendingCardChatDetails.get(destination.uuid) ?? [];
+  destinationQueue.push({
+    action,
+    cards: cardDetails,
+    createdAt: Date.now(),
+  });
+  pendingCardChatDetails.set(destination.uuid, destinationQueue);
+};
+
+const captureDealtCardDetails = (origin, destinations, context) => {
+  const enabled = game.settings.get(MODULE_ID, SETTINGS.SHOW_CARD_PLAY_DETAILS.id);
+  if (!enabled) return;
+
+  const toCreate = context.toCreate ?? [];
+  destinations.forEach((destination, index) => {
+    registerPendingCardChatDetails(destination, normalizeCreatedCards(toCreate, index), context.action);
+  });
+};
+
+const consumePendingCardChatDetails = (destinationUuids) => {
+  const now = Date.now();
+  for (const destinationUuid of destinationUuids) {
+    const queue = pendingCardChatDetails.get(destinationUuid);
+    if (!queue?.length) continue;
+
+    const freshQueue = queue.filter((details) => now - details.createdAt <= CARD_CHAT_DETAIL_TTL);
+    const details = freshQueue.shift();
+    if (freshQueue.length) pendingCardChatDetails.set(destinationUuid, freshQueue);
+    else pendingCardChatDetails.delete(destinationUuid);
+    if (details) return details;
+  }
+
+  return null;
+};
+
+const addCardDetailsToChatMessage = (message) => {
+  const enabled = game.settings.get(MODULE_ID, SETTINGS.SHOW_CARD_PLAY_DETAILS.id);
+  if (!enabled) return;
+
+  const details = consumePendingCardChatDetails(getCardsUuidsFromContent(message.content));
+  if (!details) return;
+  message.updateSource({ [`flags.${MODULE_ID}.${CARD_CHAT_DETAIL_FLAG}`]: details });
+};
+
 const getCardLabel = (value) => {
   if (value === undefined || value === null || value === "") return null;
   if (typeof value === "string") return value.trim() || null;
@@ -514,52 +631,84 @@ const enrichCardChatMessage = async (message, html) => {
   const enabled = game.settings.get(MODULE_ID, SETTINGS.SHOW_CARD_PLAY_DETAILS.id);
   if (!enabled) return;
 
-  const card = getChatCardFromMessage(message, html);
+  const cardDetails = getModuleFlag(message, CARD_CHAT_DETAIL_FLAG)
+    ?? consumePendingCardChatDetails(getChatCardsUuids(message, html));
+  const cards = cardDetails?.cards ?? [];
+
+  const card = cards.length ? null : getChatCardFromMessage(message);
   const cardImage = getCardImage(card);
-  if (!card || !cardImage) return;
-  if (!isCardMessageFaceUp(message, card)) return;
+  if (!cards.length && (!card || !cardImage || !isCardMessageFaceUp(message, card))) return;
 
   const contentNode = html.querySelector(".message-content");
   if (!contentNode) return;
 
-  const cardLink = document.createElement("a");
-  cardLink.classList.add("jay-helpers-card-link");
-  cardLink.href = "#";
-  cardLink.title = game.i18n.localize("JOURNAL.ActionShow");
-  cardLink.innerHTML = `<img src="${cardImage}" alt="${card.name}" style="width: 48px; height: 48px; object-fit: cover; border: 0;"/>`;
-  cardLink.addEventListener("click", (event) => {
-    event.preventDefault();
-    const popout = new ImagePopout({
-      src: cardImage,
-      uuid: card.uuid,
-      window: { title: card.name },
+  const renderCardLink = (detail) => {
+    const cardLink = document.createElement("a");
+    cardLink.classList.add("jay-helpers-card-link");
+    cardLink.href = "#";
+    cardLink.title = game.i18n.localize("JOURNAL.ActionShow");
+    cardLink.innerHTML = `<img src="${detail.image}" alt="${detail.name}" style="width: 48px; height: 48px; object-fit: cover; border: 0;"/>`;
+    cardLink.addEventListener("click", (event) => {
+      event.preventDefault();
+      const popout = new ImagePopout({
+        src: detail.image,
+        uuid: detail.uuid,
+        window: { title: detail.name },
+      });
+      popout.render(true);
     });
-    popout.render(true);
-  });
+    return cardLink;
+  };
 
-  const description = await foundry.applications.ux.TextEditor.enrichHTML(getCardDescription(card), { async: true });
-  const suit = getCardLabel(card.suit ?? card.system?.suit);
-  const value = getCardLabel(card.value ?? card.system?.value);
-  const meta = [
-    suit ? `<span><strong>Suit:</strong> ${suit}</span>` : null,
-    value ? `<span><strong>Value:</strong> ${value}</span>` : null,
-  ].filter(Boolean).join(" <span aria-hidden=\"true\">•</span> ");
+  const renderCardDetails = async (detail) => {
+    const description = await foundry.applications.ux.TextEditor.enrichHTML(detail.description ?? "", { async: true });
+    const suit = getCardLabel(detail.suit);
+    const value = getCardLabel(detail.value);
+    const meta = [
+      suit ? `<span><strong>Suit:</strong> ${suit}</span>` : null,
+      value ? `<span><strong>Value:</strong> ${value}</span>` : null,
+    ].filter(Boolean).join(" <span aria-hidden=\"true\">•</span> ");
 
-  const details = document.createElement("div");
-  details.classList.add("jay-helpers-card-details");
-  details.innerHTML = `
-    <div style="display:flex; flex-direction:column; gap:0.2rem;">
-      <p style="margin:0;"><strong>${card.name}</strong></p>
-      ${meta ? `<p style="margin:0; font-size:0.9em; opacity:0.9;">${meta}</p>` : ""}
-      ${description}
-    </div>`;
+    const details = document.createElement("div");
+    details.classList.add("jay-helpers-card-details");
+    details.innerHTML = `
+      <div style="display:flex; flex-direction:column; gap:0.2rem;">
+        <p style="margin:0;"><strong>${detail.name}</strong></p>
+        ${meta ? `<p style="margin:0; font-size:0.9em; opacity:0.9;">${meta}</p>` : ""}
+        ${description}
+      </div>`;
+    return details;
+  };
 
-  const wrapper = document.createElement("div");
-  wrapper.style.display = "flex";
-  wrapper.style.gap = "0.5rem";
-  wrapper.style.alignItems = "flex-start";
-  wrapper.append(cardLink, details);
-  contentNode.append(wrapper);
+  const renderCard = async (detail) => {
+    const wrapper = document.createElement("div");
+    wrapper.style.display = "flex";
+    wrapper.style.gap = "0.5rem";
+    wrapper.style.alignItems = "flex-start";
+    wrapper.append(renderCardLink(detail), await renderCardDetails(detail));
+    return wrapper;
+  };
+
+  const detailsToRender = cards.length
+    ? cards
+    : [{
+      description: getCardDescription(card),
+      image: cardImage,
+      name: card.name,
+      suit: card.suit ?? card.system?.suit,
+      uuid: card.uuid,
+      value: card.value ?? card.system?.value,
+    }];
+
+  const detailsWrapper = document.createElement("div");
+  detailsWrapper.style.display = "flex";
+  detailsWrapper.style.flexDirection = "column";
+  detailsWrapper.style.gap = "0.5rem";
+  for (const detail of detailsToRender) {
+    detailsWrapper.append(await renderCard(detail));
+  }
+
+  contentNode.append(detailsWrapper);
 };
 
 /**
@@ -598,6 +747,8 @@ const readyHook = () => {
   Hooks.on("preCreateActiveEffect", preCreateActiveEffect);
   Hooks.on('dnd5e.applyDamage', applyDamage);
   Hooks.on("applyTokenStatusEffect", applyTokenStatusEffect);
+  Hooks.on("dealCards", captureDealtCardDetails);
+  Hooks.on("preCreateChatMessage", addCardDetailsToChatMessage);
   Hooks.on("renderChatMessageHTML", enrichCardChatMessage);
 };
 
