@@ -44,6 +44,10 @@
             "syncUnconscious": {
                 "name": "Sync unconscious status?",
                 "hint": "Keep the unconscious status synchronized with health of PCs?"
+            },
+            "showCardPlayDetails": {
+                "name": "Show card play/pass details?",
+                "hint": "Show card name, description, and a clickable face icon on played or passed card chat messages."
             }
         }
     }
