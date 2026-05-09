@@ -1,0 +1,34 @@
+<section class="cards horizontal-card-hand" data-stack-id="{{document.id}}">
+  {{#if handCards.length}}
+    <ol class="horizontal-card-hand__cards">
+      {{#each handCards as |card|}}
+        <li class="horizontal-card-hand__card" data-card-id="{{card.id}}">
+          <button
+            class="horizontal-card-hand__thumbnail"
+            type="button"
+            data-action="playCard"
+            aria-label="{{localize "jay-helpers.cards.playCard" name=card.name}}"
+            {{#unless ../editable}}disabled{{/unless}}
+          >
+            <img src="{{card.img}}" alt="{{card.name}}">
+          </button>
+          <div class="horizontal-card-hand__details">
+            <span class="horizontal-card-hand__name" title="{{card.name}}">{{card.name}}</span>
+            <span class="horizontal-card-hand__face">{{card.faceLabel}}</span>
+          </div>
+          <button
+            class="horizontal-card-hand__flip"
+            type="button"
+            data-action="flipCard"
+            {{#unless ../editable}}disabled{{/unless}}
+          >
+            <i class="fa-solid fa-rotate" inert></i>
+            <span>{{localize "jay-helpers.cards.flip"}}</span>
+          </button>
+        </li>
+      {{/each}}
+    </ol>
+  {{else}}
+    <p class="horizontal-card-hand__empty">{{localize "jay-helpers.cards.emptyHand"}}</p>
+  {{/if}}
+</section>

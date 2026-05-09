@@ -1,0 +1,101 @@
+.horizontal-card-hand {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.horizontal-card-hand__cards {
+  display: flex;
+  gap: 0.75rem;
+  list-style: none;
+  margin: 0;
+  min-height: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0.25rem 0.25rem 0.5rem;
+}
+
+.horizontal-card-hand__card {
+  align-items: stretch;
+  display: flex;
+  flex: 0 0 164px;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.horizontal-card-hand__thumbnail {
+  aspect-ratio: 2 / 3;
+  background: rgb(0 0 0 / 8%);
+  border: 1px solid rgb(0 0 0 / 35%);
+  border-radius: 4px;
+  box-shadow: 0 1px 4px rgb(0 0 0 / 25%);
+  cursor: pointer;
+  display: block;
+  line-height: 0;
+  overflow: hidden;
+  padding: 0;
+  width: 100%;
+}
+
+.horizontal-card-hand__thumbnail:hover,
+.horizontal-card-hand__thumbnail:focus-visible {
+  box-shadow: 0 0 0 2px var(--color-shadow-primary);
+  outline: 0;
+}
+
+.horizontal-card-hand__thumbnail:disabled,
+.horizontal-card-hand__flip:disabled {
+  cursor: default;
+  opacity: 0.65;
+}
+
+.horizontal-card-hand__thumbnail img {
+  border: 0;
+  display: block;
+  height: 100%;
+  max-height: none;
+  max-width: none;
+  object-fit: cover;
+  width: 100%;
+}
+
+.horizontal-card-hand__details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-height: 2.6rem;
+  min-width: 0;
+}
+
+.horizontal-card-hand__name,
+.horizontal-card-hand__face {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.horizontal-card-hand__name {
+  font-weight: 600;
+}
+
+.horizontal-card-hand__face {
+  font-size: 0.85rem;
+  opacity: 0.8;
+}
+
+.horizontal-card-hand__flip {
+  align-items: center;
+  display: inline-flex;
+  gap: 0.35rem;
+  justify-content: center;
+  min-height: 1.9rem;
+  width: 100%;
+}
+
+.horizontal-card-hand__empty {
+  margin: 0.5rem;
+  opacity: 0.75;
+  text-align: center;
+}

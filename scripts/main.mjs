@@ -82,6 +82,8 @@ const CARD_CHAT_DETAIL_FLAG = "cardDetails";
 const CARD_CHAT_DETAIL_TTL = 10000;
 const pendingCardChatDetails = new Map();
 
+const CARD_HAND_SHEET_TEMPLATE = `modules/${MODULE_ID}/templates/horizontal-card-hand.hbs`;
+
 /**
  * Log to the console.
  * 
@@ -558,6 +560,99 @@ const getCardSnapshot = (card) => {
   };
 };
 
+const getFaceCount = (card) => {
+  return card?.faces?.length ?? 0;
+};
+
+const getCardFaceIndex = (card) => {
+  return Number.isInteger(card?.face) ? card.face : null;
+};
+
+const getNextCardFace = (card) => {
+  const currentFace = getCardFaceIndex(card);
+  if (currentFace === null) return 0;
+  if (card.hasNextFace) return currentFace + 1;
+  return null;
+};
+
+const getCardThumbnailData = (card) => {
+  const faceIndex = getCardFaceIndex(card);
+  const faceCount = getFaceCount(card);
+  const label = faceIndex === null
+    ? game.i18n.localize(`${MODULE_ID}.cards.faceDown`)
+    : game.i18n.format(`${MODULE_ID}.cards.faceNumber`, {
+      number: faceIndex + 1,
+      total: faceCount,
+    });
+
+  return {
+    faceLabel: label,
+    faceUp: Boolean(card.showFace),
+    id: card.id,
+    img: card.img,
+    name: card.name,
+  };
+};
+
+class HorizontalCardHandConfig extends foundry.applications.sheets.CardHandConfig {
+  static DEFAULT_OPTIONS = {
+    position: { width: 780 },
+    actions: {
+      flipCard: HorizontalCardHandConfig.flipCard,
+      playCard: HorizontalCardHandConfig.playCard,
+    },
+  };
+
+  static PARTS = foundry.utils.mergeObject(
+    super.PARTS,
+    {
+      cards: {
+        root: true,
+        scrollable: [".cards"],
+        template: CARD_HAND_SHEET_TEMPLATE,
+      },
+    },
+    { inplace: false },
+  );
+
+  async _preparePartContext(partId, context, options) {
+    const preparedContext = await super._preparePartContext(partId, context, options);
+    if (partId !== "cards") return preparedContext;
+    const cards = preparedContext.cards ?? this._prepareCards();
+    return {
+      ...preparedContext,
+      handCards: cards.map((card) => getCardThumbnailData(card.document ?? card)),
+    };
+  }
+
+  _getCardFromTarget(target) {
+    const cardId = target.closest("[data-card-id]")?.dataset.cardId;
+    return cardId ? this.document.cards.get(cardId) : null;
+  }
+
+  static async flipCard(event, target) {
+    event.preventDefault();
+    const card = this._getCardFromTarget(target);
+    if (!card) return;
+    await card.flip(getNextCardFace(card));
+  }
+
+  static async playCard(event, target) {
+    event.preventDefault();
+    const card = this._getCardFromTarget(target);
+    if (!card) return;
+    await this.document.playDialog(card);
+  }
+}
+
+const registerHorizontalCardHandSheet = () => {
+  DocumentSheetConfig.registerSheet(CONFIG.Cards.documentClass, MODULE_ID, HorizontalCardHandConfig, {
+    label: `${MODULE_ID}.cards.sheetName`,
+    types: ["hand"],
+    makeDefault: false,
+  });
+};
+
 const normalizeCardCreateOperation = (operation) => {
   if (!operation) return [];
   if (Array.isArray(operation)) return operation.flatMap(normalizeCardCreateOperation);
@@ -779,6 +874,8 @@ const initHook = () => {
 
   // Update bloodied icon
   CONFIG.DND5E.bloodied.img = `modules/${MODULE_ID}/images/bleeding-wound.svg`;
+
+  registerHorizontalCardHandSheet();
 
   Hooks.on("renderChatMessageHTML", enrichCardChatMessage);
 };
