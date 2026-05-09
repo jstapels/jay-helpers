@@ -779,6 +779,8 @@ const initHook = () => {
 
   // Update bloodied icon
   CONFIG.DND5E.bloodied.img = `modules/${MODULE_ID}/images/bleeding-wound.svg`;
+
+  Hooks.on("renderChatMessageHTML", enrichCardChatMessage);
 };
 
 /**
@@ -799,7 +801,6 @@ const readyHook = () => {
   Hooks.on("dealCards", captureDealtCardDetails);
   Hooks.on("passCards", capturePassedCardDetails);
   Hooks.on("preCreateChatMessage", addCardDetailsToChatMessage);
-  Hooks.on("renderChatMessageHTML", enrichCardChatMessage);
 };
 
 Hooks.once('init', initHook);
