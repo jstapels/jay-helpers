@@ -597,8 +597,8 @@ const getCardThumbnailData = (card) => {
 
 class HorizontalCardHandConfig extends foundry.applications.sheets.CardHandConfig {
   static DEFAULT_OPTIONS = {
+    window: { resizeable: true },
     position: { width: 600 },
-    resizable: true,
     actions: {
       flipCard: HorizontalCardHandConfig.flipCard,
       playCard: HorizontalCardHandConfig.playCard,
