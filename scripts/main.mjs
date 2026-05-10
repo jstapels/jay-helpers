@@ -663,33 +663,8 @@ const normalizeCardCreateOperation = (operation) => {
   return [operation];
 };
 
-const normalizeCreatedCards = (toCreate, destinationIndex) => {
-  const created = toCreate[destinationIndex];
-  if (Array.isArray(created)) return created.flatMap(normalizeCardCreateOperation);
-  if (Array.isArray(toCreate) && toCreate.every((entry) => Array.isArray(entry))) return [];
-  return normalizeCardCreateOperation(toCreate);
-};
-
 const getCardsDocument = (document) => {
   return document?.documentName === "Cards" ? document : null;
-};
-
-const getCardIdentifier = (card) => {
-  return card?.id ?? card?._id;
-};
-
-const cardBelongsToCardsDocument = (cardsDocument, card) => {
-  const cardId = getCardIdentifier(card);
-  return Boolean(cardId && cardsDocument.cards?.get(cardId));
-};
-
-const getCardParentCardsDocument = (card) => {
-  return getCardsDocument(card?.parent);
-};
-
-const getCardDetailsDestination = (cards, candidates) => {
-  return cards.map(getCardParentCardsDocument).find(Boolean)
-    ?? candidates.find((candidate) => cards.some((card) => cardBelongsToCardsDocument(candidate, card)));
 };
 
 const isDrawCardAction = (action) => {
@@ -735,35 +710,12 @@ const registerPendingCardChatDetails = (destination, cards, action, { fallback =
   }
 };
 
-const captureDealtCardDetails = (origin, destinations, context) => {
-  const enabled = game.settings.get(MODULE_ID, SETTINGS.SHOW_CARD_PLAY_DETAILS.id);
-  if (!enabled) return;
-
-  const toCreate = context.toCreate ?? [];
-  destinations.forEach((destination, index) => {
-    registerPendingCardChatDetails(destination, normalizeCreatedCards(toCreate, index), context.action, {
-      fallback: isDrawCardAction(context.action),
-    });
-  });
-};
-
 const capturePassedCardDetails = (origin, destination, context) => {
   const enabled = game.settings.get(MODULE_ID, SETTINGS.SHOW_CARD_PLAY_DETAILS.id);
   if (!enabled) return;
 
   const cards = normalizeCardCreateOperation(context.toCreate ?? context.toUpdate ?? []);
   registerPendingCardChatDetails(destination, cards, context.action);
-};
-
-const captureDrawnCardDetails = (...args) => {
-  const enabled = game.settings.get(MODULE_ID, SETTINGS.SHOW_CARD_PLAY_DETAILS.id);
-  if (!enabled) return;
-
-  const context = args.at(-1);
-  const cards = normalizeCardCreateOperation(context?.toCreate ?? context?.toUpdate ?? []);
-  const candidates = args.map(getCardsDocument).filter(Boolean);
-  const destination = getCardDetailsDestination(cards, candidates);
-  registerPendingCardChatDetails([destination, ...candidates], cards, context?.action, { fallback: true });
 };
 
 const captureCreatedCardDetails = (card, context) => {
@@ -995,9 +947,7 @@ const readyHook = () => {
   Hooks.on("preCreateActiveEffect", preCreateActiveEffect);
   Hooks.on('dnd5e.applyDamage', applyDamage);
   Hooks.on("applyTokenStatusEffect", applyTokenStatusEffect);
-  Hooks.on("dealCards", captureDealtCardDetails);
   Hooks.on("passCards", capturePassedCardDetails);
-  Hooks.on("drawCards", captureDrawnCardDetails);
   Hooks.on("createCard", captureCreatedCardDetails);
   Hooks.on("preCreateChatMessage", addCardDetailsToChatMessage);
 };
