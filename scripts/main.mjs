@@ -131,9 +131,12 @@ const getActionEffect = (actor, actionType, { includeDisabled = false } = {}) =>
   });
 };
 
-const actorInCombat = (actor) => {
-  return game.combat?.getCombatantByActor(actor);
+const getActorCombatant = (actor) => {
+  if (!actor) return null;
+  return game.combat?.getCombatantsByActor(actor)?.[0] ?? null;
 };
+
+const actorInCombat = (actor) => Boolean(getActorCombatant(actor));
 
 const isActionEnabled = (actionType) => {
   const settingId = actionSetting[actionType];
@@ -214,6 +217,7 @@ let preUseActivity = async (activity) => {
 const applyActorSelfEffects = async (actor, effects, origin) => {
   // Apply associated effects.
   for (const effect of effects) {
+    if (!effect) continue;
     log("Activate effect", effect);
     // Enable an existing effect on the target if it originated from this effect
     const existingEffect = actor.effects.find((e) => e.origin === origin.uuid);
@@ -279,14 +283,14 @@ let preRollAttack = async (config) => {
   const item = activity?.parent?.parent;
   const actor = item?.actor;
 
-  const combatant = game.combat?.getCombatantByActor(item.actor);
+  const combatant = getActorCombatant(actor);
   if (!combatant) return true;
 
   // Legendary actions don't consume reactions.
   if (activity.activation?.type === 'legendary') return true;
 
   // If attacking and it's not owner's turn, assume an opportunity attack, check reaction.
-  if (game.combat.combatant.id !== combatant.id) {
+  if (game.combat?.combatant?.id !== combatant.id) {
     return checkActionUsage(actor, item, 'reaction');
   }
 
@@ -301,7 +305,7 @@ let rollAttack = async (rolls, data) => {
   const item = activity?.parent?.parent;
   const actor = item?.actor;
 
-  const combatant = game.combat?.getCombatantByActor(item.actor);
+  const combatant = getActorCombatant(actor);
   if (!combatant) return;
 
   // Legendary actions don't consume reactions.
@@ -309,7 +313,7 @@ let rollAttack = async (rolls, data) => {
 
   // If attacking and it's not your turn, assume an opportunity attack, use reaction.
   const reactionEnable = game.settings.get(MODULE_ID, SETTINGS.TRACK_REACTION.id);
-  if (reactionEnable && game.combat.combatant.id !== combatant.id) {
+  if (reactionEnable && game.combat?.combatant?.id !== combatant.id) {
     ui.notifications.info("You're attacking when it's not your turn, assuming an Opportunity Attack.");
     await createActionUsage(actor, item, 'reaction');
   }
@@ -363,7 +367,7 @@ const applyDamage = async (actor, damage, options) => {
   log('applyDamage', actor, damage, options);
 
   // Only track combatants
-  const combatant = game.combat?.getCombatantByActor(actor);
+  const combatant = getActorCombatant(actor);
   if (!combatant) return;
 
   const importantChar = actor.type === 'character' || (actor.type === 'npc' && actor.system.traits.important);
@@ -406,7 +410,7 @@ const applyTokenStatusEffect = async (token, status, state) => {
   if (!actor) return;
 
   // Only track combatants
-  const combatant = game.combat?.getCombatantByActor(actor);
+  const combatant = getActorCombatant(actor);
   if (!combatant) return;
 
   // Only track NPCs

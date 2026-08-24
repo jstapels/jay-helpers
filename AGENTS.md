@@ -1,6 +1,6 @@
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to coding agents working in this repository.
 
 ## Project Overview
 
@@ -9,10 +9,15 @@ This is a Foundry VTT module for the D&D 5e system that provides quality-of-life
 ## Development Commands
 
 ### Linting
+
 ```bash
 npm run lint          # Check for linting errors
 npm run lint-fix      # Auto-fix linting errors
 ```
+
+## Versioning
+
+Whenever making a repository change, check whether the version has already been updated for the current set of changes. If it has not, increment the version according to semantic versioning (`major.minor.patch`): use a patch increment for backward-compatible fixes or documentation changes, a minor increment for backward-compatible features, and a major increment for breaking changes. Keep the version synchronized in `package.json`, `package-lock.json`, and `module.json`.
 
 ## Architecture
 
@@ -23,6 +28,7 @@ The entire module is implemented as a single ES module file (`scripts/main.mjs`)
 ### Core Components
 
 **Settings System**: Module uses `SETTINGS` object to define all configuration options. Each setting has:
+
 - `id`: Setting identifier
 - `type`: Data type (typically Boolean)
 - `default`: Default value
@@ -30,6 +36,7 @@ The entire module is implemented as a single ES module file (`scripts/main.mjs`)
 - Optional `requiresReload`: Whether changing requires page reload
 
 **Hook Architecture**: Module exclusively uses Foundry's `Hooks` system to respond to events. Key hook points:
+
 - `init`: Settings registration and CONFIG modifications (runs once during initialization)
 - `ready`: Hook registration (runs once when Foundry is ready)
 - `dnd5e.preUseActivity` / `dnd5e.postUseActivity`: Action tracking before/after item use
@@ -50,6 +57,7 @@ The entire module is implemented as a single ES module file (`scripts/main.mjs`)
 **Opportunity Attack Detection**: Detects attacks made when it's not the actor's turn and treats them as opportunity attacks that consume reactions.
 
 **Status Synchronization**:
+
 - NPCs: Syncs defeated status with 0 HP
 - PCs/Important NPCs: Syncs unconscious status with 0 HP
 - Only applies to combatants in active combat
@@ -61,6 +69,7 @@ The entire module is implemented as a single ES module file (`scripts/main.mjs`)
 ### Global Variables
 
 The module relies heavily on Foundry VTT globals defined in `eslint.config.mjs`:
+
 - `game`: Main game instance with settings, combat, users, i18n
 - `ui`: User interface (notifications)
 - `Hooks`: Event system
